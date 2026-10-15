@@ -1,0 +1,6 @@
+@CSCN73030_26F_Sec1_ProjectV_Group_6.Server_HostAddress = http://localhost:5058
+
+GET {{CSCN73030_26F_Sec1_ProjectV_Group_6.Server_HostAddress}}/weatherforecast/
+Accept: application/json
+
+###
