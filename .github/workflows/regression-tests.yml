@@ -1,0 +1,47 @@
+name: Regression tests
+
+on:
+  push:
+  workflow_dispatch:
+
+jobs:
+  server:
+    name: Server (xUnit)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 10.0.x
+
+      # Building the server also restores the React client through the .esproj reference.
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Run server tests
+        run: dotnet test CSCN73030-26F-Sec1-ProjectV-Group-6.Server.Tests --logger "console;verbosity=normal"
+
+  client:
+    name: Client (Vitest)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: cscn73030-26f-sec1-projectv-group-6.client
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: cscn73030-26f-sec1-projectv-group-6.client/package-lock.json
+
+      - run: npm ci
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Run client tests
+        run: npm test

@@ -26,3 +26,6 @@ app.MapControllers();
 app.MapFallbackToFile("/index.html");
 
 app.Run();
+
+// Exposes the entry point so the test project can boot the app with WebApplicationFactory<Program>.
+public partial class Program { }

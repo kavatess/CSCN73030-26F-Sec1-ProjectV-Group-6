@@ -7,6 +7,8 @@ Project("{54A90642-561A-4BB1-A94E-469ADEE60C69}") = "cscn73030-26f-sec1-projectv
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "CSCN73030-26F-Sec1-ProjectV-Group-6.Server", "CSCN73030-26F-Sec1-ProjectV-Group-6.Server\CSCN73030-26F-Sec1-ProjectV-Group-6.Server.csproj", "{3C2E99A6-4978-4783-8DF7-D3DD30D09D56}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "CSCN73030-26F-Sec1-ProjectV-Group-6.Server.Tests", "CSCN73030-26F-Sec1-ProjectV-Group-6.Server.Tests\CSCN73030-26F-Sec1-ProjectV-Group-6.Server.Tests.csproj", "{70FAC60B-4190-42CE-896C-98DAE5FAE48F}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -23,6 +25,10 @@ Global
 		{3C2E99A6-4978-4783-8DF7-D3DD30D09D56}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{3C2E99A6-4978-4783-8DF7-D3DD30D09D56}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{3C2E99A6-4978-4783-8DF7-D3DD30D09D56}.Release|Any CPU.Build.0 = Release|Any CPU
+		{70FAC60B-4190-42CE-896C-98DAE5FAE48F}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{70FAC60B-4190-42CE-896C-98DAE5FAE48F}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{70FAC60B-4190-42CE-896C-98DAE5FAE48F}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{70FAC60B-4190-42CE-896C-98DAE5FAE48F}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
