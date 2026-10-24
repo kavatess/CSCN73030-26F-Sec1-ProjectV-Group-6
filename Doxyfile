@@ -1,0 +1,50 @@
+# Doxygen configuration for the Staff/HR service.
+# Run `doxygen Doxyfile` from the repository root; the site is written to docs/doxygen/html.
+
+PROJECT_NAME           = "Staff/HR Service - CSCN73030 Group 6"
+PROJECT_BRIEF          = "Staff & Human Resources service of the City Management Enterprise System"
+OUTPUT_DIRECTORY       = docs/doxygen
+
+# What to document: the ASP.NET server, the React client sources and the markdown pages.
+INPUT                  = CSCN73030-26F-Sec1-ProjectV-Group-6.Server \
+                         cscn73030-26f-sec1-projectv-group-6.client/src \
+                         docs/mainpage.md \
+                         docs/REGRESSION_TESTING.md
+RECURSIVE              = YES
+FILE_PATTERNS          = *.cs *.js *.jsx *.md
+EXCLUDE_PATTERNS       = */bin/* \
+                         */obj/* \
+                         */node_modules/* \
+                         */Properties/* \
+                         */src/test/* \
+                         *.test.jsx
+EXTENSION_MAPPING      = jsx=JavaScript
+USE_MDFILE_AS_MAINPAGE = docs/mainpage.md
+
+# Document everything, including private members, so gaps are visible.
+EXTRACT_ALL            = YES
+EXTRACT_PRIVATE        = YES
+EXTRACT_STATIC         = YES
+JAVADOC_AUTOBRIEF      = YES
+MARKDOWN_SUPPORT       = YES
+
+# Output
+GENERATE_HTML          = YES
+GENERATE_LATEX         = NO
+GENERATE_TREEVIEW      = YES
+SOURCE_BROWSER         = YES
+HTML_DYNAMIC_SECTIONS  = YES
+
+# Diagrams need Graphviz (the `dot` tool). Set HAVE_DOT to NO if it is not installed.
+HAVE_DOT               = YES
+CLASS_GRAPH            = YES
+COLLABORATION_GRAPH    = YES
+CALL_GRAPH             = NO
+DOT_IMAGE_FORMAT       = svg
+INTERACTIVE_SVG        = YES
+
+# Warnings
+QUIET                  = YES
+WARNINGS               = YES
+WARN_IF_UNDOCUMENTED   = YES
+WARN_IF_DOC_ERROR      = YES
