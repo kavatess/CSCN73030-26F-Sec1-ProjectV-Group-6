@@ -1,6 +1,20 @@
 ﻿import { useEffect, useState } from 'react';
 import './App.css';
 
+/**
+ * @file App.jsx
+ * @brief Root React component of the Staff/HR client.
+ */
+
+/**
+ * @brief Page that shows the forecasts served by the API in a table.
+ *
+ * On mount it requests `weatherforecast` from the server. While no data has arrived, or the
+ * server answered with an error, it shows a loading message instead of the table.
+ * Sample template code; it will be replaced by the Staff/HR screens.
+ *
+ * @returns {JSX.Element} The page heading and either the loading message or the forecast table.
+ */
 function App() {
     const [forecasts, setForecasts] = useState();
 
@@ -39,6 +53,11 @@ function App() {
         </div>
     );
     
+    /**
+     * @brief Fetches the forecasts from the API and stores them in state.
+     *
+     * Does nothing when the response is not OK. Network failures are not caught.
+     */
     async function populateWeatherData() {
         const response = await fetch('weatherforecast');
         if (response.ok) {
