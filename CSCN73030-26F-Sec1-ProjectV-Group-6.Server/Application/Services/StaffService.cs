@@ -1,0 +1,203 @@
+using CSCN73030_26F_Sec1_ProjectV_Group_6.Server.Application.Errors;
+using CSCN73030_26F_Sec1_ProjectV_Group_6.Server.Application.Validation;
+using CSCN73030_26F_Sec1_ProjectV_Group_6.Server.Contracts;
+using CSCN73030_26F_Sec1_ProjectV_Group_6.Server.Data.Repositories;
+using CSCN73030_26F_Sec1_ProjectV_Group_6.Server.Domain;
+
+namespace CSCN73030_26F_Sec1_ProjectV_Group_6.Server.Application.Services;
+
+/// <summary>Create, read, update and search employees.</summary>
+public class StaffService(
+    StaffRepository staffRepository,
+    DepartmentRepository departmentRepository,
+    Clock clock)
+{
+    private const int MinimumAgeAtHire = 16;
+    public const int MaxPageSize = 100;
+
+    /// <summary>
+    /// Creates an employee and issues a staff number. The number is taken from the sequence and the
+    /// Staff row (plus optional first assignment) is inserted inside one transaction (business rule 1).
+    /// </summary>
+    public async Task<StaffProfileDto> CreateAsync(CreateStaffRequest request)
+    {
+        var errors = new ValidationErrors();
+        errors.Required("firstName", request.FirstName);
+        errors.Required("lastName", request.LastName);
+        errors.MaxLength("preferredName", request.PreferredName, 100);
+        errors.Required("email", request.Email, 254);
+        errors.Email("email", request.Email);
+        errors.MaxLength("phone", request.Phone, 30);
+        errors.MaxLength("citizenId", request.CitizenId, 30);
+        errors.Required("dateOfBirth", request.DateOfBirth);
+        errors.Required("hireDate", request.HireDate);
+        errors.Required("employmentType", request.EmploymentType);
+        errors.Required("homeDepartmentCode", request.HomeDepartmentCode, 10);
+        errors.AddIf(request.EmploymentStatus is not (null or EmploymentStatus.Active or EmploymentStatus.Probation),
+            "employmentStatus", "A new employee must start as Active or Probation.");
+        ValidateBirthAndHireDates(errors, request.DateOfBirth, request.HireDate);
+
+        var department = string.IsNullOrWhiteSpace(request.HomeDepartmentCode)
+            ? null
+            : await departmentRepository.GetByCodeAsync(request.HomeDepartmentCode);
+        errors.AddIf(department == null && !string.IsNullOrWhiteSpace(request.HomeDepartmentCode),
+            "homeDepartmentCode", $"Unknown department code '{request.HomeDepartmentCode}'.");
+
+        Service? service = null;
+        var first = request.InitialAssignment;
+        if (first != null)
+        {
+            errors.Required("initialAssignment.serviceId", first.ServiceId);
+            errors.Required("initialAssignment.roleTitle", first.RoleTitle);
+            if (first.ServiceId != null)
+            {
+                service = await departmentRepository.GetServiceAsync(first.ServiceId.Value);
+                errors.AddIf(service == null, "initialAssignment.serviceId", $"Unknown service id {first.ServiceId}.");
+            }
+            var start = first.StartDate ?? request.HireDate ?? clock.Today;
+            errors.AddIf(first.EndDate != null && first.EndDate <= start,
+                "initialAssignment.endDate", "EndDate must be after StartDate.");
+        }
+
+        errors.ThrowIfAny();
+
+        var email = Text.NormaliseEmail(request.Email!);
+        if (await staffRepository.EmailInUseAsync(email))
+            throw new ConflictException($"The work email '{email}' is already in use by another employee.");
+
+        await using var transaction = await staffRepository.BeginTransactionAsync();
+
+        var staff = new Staff
+        {
+            StaffNumber = await staffRepository.NextStaffNumberAsync(),
+            FirstName = request.FirstName!.Trim(),
+            LastName = request.LastName!.Trim(),
+            PreferredName = Text.TrimToNull(request.PreferredName),
+            Email = email,
+            DateOfBirth = request.DateOfBirth!.Value,
+            Phone = Text.TrimToNull(request.Phone),
+            CitizenId = Text.TrimToNull(request.CitizenId),
+            HireDate = request.HireDate!.Value,
+            EmploymentType = request.EmploymentType!.Value,
+            EmploymentStatus = request.EmploymentStatus ?? EmploymentStatus.Probation,
+            HomeDepartmentId = department!.DepartmentId,
+        };
+
+        if (first != null)
+        {
+            staff.Assignments.Add(new StaffAssignment
+            {
+                ServiceId = service!.ServiceId,
+                RoleTitle = first.RoleTitle!.Trim(),
+                StartDate = first.StartDate ?? staff.HireDate,
+                EndDate = first.EndDate,
+            });
+        }
+
+        staffRepository.Add(staff);
+        await staffRepository.SaveChangesAsync();
+        await transaction.CommitAsync();
+
+        return await GetProfileAsync(staff.StaffNumber);
+    }
+
+    public async Task<StaffProfileDto> GetProfileAsync(string staffNumber)
+    {
+        var staff = await staffRepository.GetByNumberAsync(staffNumber, withDetails: true)
+                    ?? throw new NotFoundException("Staff", staffNumber);
+        return staff.ToProfile(clock.Today);
+    }
+
+    /// <summary>Partial update. Null fields are left unchanged; the staff number can never change.</summary>
+    public async Task<StaffProfileDto> UpdateAsync(string staffNumber, UpdateStaffRequest request)
+    {
+        var staff = await staffRepository.GetByNumberAsync(staffNumber)
+                    ?? throw new NotFoundException("Staff", staffNumber);
+
+        var errors = new ValidationErrors();
+        // Business rule 1: reject any attempt to change the staff number.
+        errors.AddIf(request.StaffNumber != null && request.StaffNumber.Trim() != staff.StaffNumber,
+            "staffNumber", "The staff number is permanent and cannot be changed.");
+        errors.NotBlankIfPresent("firstName", request.FirstName);
+        errors.NotBlankIfPresent("lastName", request.LastName);
+        errors.MaxLength("preferredName", request.PreferredName, 100);
+        errors.NotBlankIfPresent("email", request.Email, 254);
+        errors.Email("email", request.Email);
+        errors.MaxLength("phone", request.Phone, 30);
+        errors.MaxLength("citizenId", request.CitizenId, 30);
+        errors.AddIf(request.EmploymentStatus == EmploymentStatus.Terminated, "employmentStatus",
+            "Termination must go through a termination requisition, which is not available in this release.");
+        ValidateBirthAndHireDates(errors, request.DateOfBirth ?? staff.DateOfBirth, request.HireDate ?? staff.HireDate);
+
+        Department? newDepartment = null;
+        if (request.HomeDepartmentCode != null)
+        {
+            newDepartment = await departmentRepository.GetByCodeAsync(request.HomeDepartmentCode);
+            errors.AddIf(newDepartment == null, "homeDepartmentCode", $"Unknown department code '{request.HomeDepartmentCode}'.");
+        }
+
+        errors.ThrowIfAny();
+
+        if (request.Email != null)
+        {
+            var email = Text.NormaliseEmail(request.Email);
+            if (email != staff.Email && await staffRepository.EmailInUseAsync(email, staff.StaffId))
+                throw new ConflictException($"The work email '{email}' is already in use by another employee.");
+            staff.Email = email;
+        }
+
+        if (request.FirstName != null) staff.FirstName = request.FirstName.Trim();
+        if (request.LastName != null) staff.LastName = request.LastName.Trim();
+        if (request.PreferredName != null) staff.PreferredName = Text.TrimToNull(request.PreferredName);
+        if (request.Phone != null) staff.Phone = Text.TrimToNull(request.Phone);
+        if (request.CitizenId != null) staff.CitizenId = Text.TrimToNull(request.CitizenId);
+        if (request.DateOfBirth != null) staff.DateOfBirth = request.DateOfBirth.Value;
+        if (request.HireDate != null) staff.HireDate = request.HireDate.Value;
+        if (request.EmploymentType != null) staff.EmploymentType = request.EmploymentType.Value;
+        if (request.EmploymentStatus != null) staff.EmploymentStatus = request.EmploymentStatus.Value;
+        // A transfer changes the home department only; the staff number stays the same.
+        if (newDepartment != null) staff.HomeDepartmentId = newDepartment.DepartmentId;
+
+        await staffRepository.SaveChangesAsync();
+        return await GetProfileAsync(staff.StaffNumber);
+    }
+
+    public async Task<PagedResult<StaffSummaryDto>> SearchAsync(StaffSearchQuery query)
+    {
+        var errors = new ValidationErrors();
+        ValidatePaging(errors, query.Page, query.PageSize);
+
+        int? departmentId = null;
+        if (!string.IsNullOrWhiteSpace(query.Department))
+        {
+            var department = await departmentRepository.GetByCodeAsync(query.Department);
+            errors.AddIf(department == null, "department", $"Unknown department code '{query.Department}'.");
+            departmentId = department?.DepartmentId;
+        }
+        errors.ThrowIfAny();
+
+        var today = clock.Today;
+        var (items, total) = await staffRepository.SearchAsync(
+            new StaffSearchCriteria(query.Q, departmentId, query.Service, query.Role, query.Status,
+                query.CredentialState, query.Page, query.PageSize),
+            today);
+
+        return new PagedResult<StaffSummaryDto>(
+            items.Select(s => s.ToSummary(today)).ToList(), query.Page, query.PageSize, total);
+    }
+
+    public static void ValidatePaging(ValidationErrors errors, int page, int pageSize)
+    {
+        errors.AddIf(page < 1, "page", "Page must be 1 or more.");
+        errors.AddIf(pageSize is < 1 or > MaxPageSize, "pageSize", $"PageSize must be between 1 and {MaxPageSize}.");
+    }
+
+    private void ValidateBirthAndHireDates(ValidationErrors errors, DateOnly? dateOfBirth, DateOnly? hireDate)
+    {
+        if (dateOfBirth != null)
+            errors.AddIf(dateOfBirth >= clock.Today, "dateOfBirth", "Date of birth must be in the past.");
+        if (dateOfBirth != null && hireDate != null)
+            errors.AddIf(hireDate < dateOfBirth.Value.AddYears(MinimumAgeAtHire), "hireDate",
+                $"Hire date must be at least {MinimumAgeAtHire} years after date of birth.");
+    }
+}

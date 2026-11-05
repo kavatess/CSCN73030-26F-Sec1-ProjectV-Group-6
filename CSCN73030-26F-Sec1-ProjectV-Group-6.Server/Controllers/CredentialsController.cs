@@ -1,0 +1,56 @@
+using CSCN73030_26F_Sec1_ProjectV_Group_6.Server.Application.Services;
+using CSCN73030_26F_Sec1_ProjectV_Group_6.Server.Contracts;
+using CSCN73030_26F_Sec1_ProjectV_Group_6.Server.Infrastructure;
+using Microsoft.AspNetCore.Mvc;
+
+namespace CSCN73030_26F_Sec1_ProjectV_Group_6.Server.Controllers;
+
+[ApiController]
+[Produces("application/json")]
+[Tags("Credentials")]
+public class CredentialsController(CredentialService credentialService) : ControllerBase
+{
+    /// <summary>Search credentials across the city, soonest expiry first. Returns a paged envelope.</summary>
+    [HttpGet("credentials")]
+    [ProducesResponseType<PagedResult<CredentialDto>>(StatusCodes.Status200OK)]
+    [ProblemResponse(StatusCodes.Status400BadRequest, "One or more query values could not be read.",
+        ExampleErrors = ["state=The value 'Lapsed' is not valid for State."])]
+    [ProblemResponse(StatusCodes.Status422UnprocessableEntity, "One or more fields are invalid. See 'errors' for details.",
+        ExampleErrors = ["page=Page must be 1 or more."])]
+    public async Task<ActionResult<PagedResult<CredentialDto>>> Search([FromQuery] CredentialQuery query) =>
+        await credentialService.SearchAsync(query);
+
+    /// <summary>Credentials that have not expired yet but will within the given number of days. Suspended ones are excluded.</summary>
+    /// <param name="withinDays">0 to 365. Defaults to 30.</param>
+    [HttpGet("credentials/expiring")]
+    [ProducesResponseType<List<CredentialDto>>(StatusCodes.Status200OK)]
+    [ProblemResponse(StatusCodes.Status422UnprocessableEntity, "One or more fields are invalid. See 'errors' for details.",
+        ExampleErrors = ["withinDays=withinDays must be between 0 and 365."])]
+    public async Task<ActionResult<List<CredentialDto>>> Expiring(int withinDays = 30) =>
+        await credentialService.ExpiringAsync(withinDays);
+
+    /// <summary>Record a new credential for a staff member.</summary>
+    [HttpPost("staff/{staffNumber}/credentials")]
+    [ProducesResponseType<CredentialDto>(StatusCodes.Status201Created)]
+    [ProblemResponse(StatusCodes.Status400BadRequest, "The request body could not be read.",
+        ExampleErrors = ["$.expiryDate=The JSON value could not be converted to System.Nullable`1[System.DateOnly]."])]
+    [ProblemResponse(StatusCodes.Status404NotFound, "Staff 'STF-0000999' was not found.")]
+    [ProblemResponse(StatusCodes.Status422UnprocessableEntity, "One or more fields are invalid. See 'errors' for details.",
+        ExampleErrors = ["expiryDate=ExpiryDate must be after IssueDate."])]
+    public async Task<ActionResult<CredentialDto>> Create(string staffNumber, CreateCredentialRequest request)
+    {
+        var credential = await credentialService.CreateAsync(staffNumber, request);
+        return Created($"/credentials/{credential.CredentialId}", credential);
+    }
+
+    /// <summary>Record a renewal (new number / dates) or suspend / lift a suspension.</summary>
+    [HttpPatch("credentials/{id:int}")]
+    [ProducesResponseType<CredentialDto>(StatusCodes.Status200OK)]
+    [ProblemResponse(StatusCodes.Status400BadRequest, "The request body could not be read.",
+        ExampleErrors = ["$.suspended=The JSON value could not be converted to System.Nullable`1[System.Boolean]."])]
+    [ProblemResponse(StatusCodes.Status404NotFound, "Credential '42' was not found.")]
+    [ProblemResponse(StatusCodes.Status422UnprocessableEntity, "One or more fields are invalid. See 'errors' for details.",
+        ExampleErrors = ["expiryDate=ExpiryDate must be after IssueDate."])]
+    public async Task<ActionResult<CredentialDto>> Update(int id, UpdateCredentialRequest request) =>
+        await credentialService.UpdateAsync(id, request);
+}

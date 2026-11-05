@@ -8,6 +8,10 @@
     <SpaRoot>..\cscn73030-26f-sec1-projectv-group-6.client</SpaRoot>
     <SpaProxyLaunchCommand>npm run dev</SpaProxyLaunchCommand>
     <SpaProxyServerUrl>https://localhost:54552</SpaProxyServerUrl>
+    <!-- XML doc comments feed the OpenAPI document (summaries on endpoints and DTOs). -->
+    <GenerateDocumentationFile>true</GenerateDocumentationFile>
+    <!-- 1591/1573: not every member needs XML docs. 1587: Doxygen-style @file headers. -->
+    <NoWarn>$(NoWarn);1591;1573;1587</NoWarn>
   </PropertyGroup>
 
   <ItemGroup>
@@ -15,6 +19,15 @@
     <PackageReference Include="Microsoft.AspNetCore.SpaProxy">
       <Version>10.*-*</Version>
     </PackageReference>
+    <PackageReference Include="Microsoft.EntityFrameworkCore.SqlServer" Version="10.0.12" />
+    <PackageReference Include="Microsoft.EntityFrameworkCore.Design" Version="10.0.12">
+      <PrivateAssets>all</PrivateAssets>
+      <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+    </PackageReference>
+    <PackageReference Include="Microsoft.Extensions.Diagnostics.HealthChecks.EntityFrameworkCore" Version="10.0.12" />
+    <PackageReference Include="Swashbuckle.AspNetCore.SwaggerUI" Version="10.2.3" />
+    <!-- Pinned above the version Microsoft.Data.SqlClient pulls in, which has known vulnerabilities (NU1902/NU1903). -->
+    <PackageReference Include="System.Security.Cryptography.Pkcs" Version="10.0.14" />
   </ItemGroup>
 
   <ItemGroup>

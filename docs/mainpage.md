@@ -54,12 +54,12 @@ digraph arch {
 During development the server starts the Vite dev server through SpaProxy. The client calls the API
 with a relative URL, so the same code works behind the Vite proxy and when served by ASP.NET.
 
-## Current state (release v0.1.0-sprint1)
+## Current state
 
-The application still contains the project template's weather-forecast sample:
-WeatherForecastController, WeatherForecast and App. It shows the controller and client patterns the
-Staff/HR features will follow and is covered by regression tests. No Staff/HR features are
-implemented yet; see @ref REGRESSION_TESTING.md "Regression testing" for the test cases.
+The Staff/HR backend implements staff, departments and services, assignments, duty rosters,
+hire requisitions and credentials on SQL Server through EF Core. See `README.md` for how to migrate, seed and
+run it, and `API.md` for the endpoint contract. The template's weather-forecast sample is still present
+because the existing regression tests cover it.
 
 ## Requirements
 
