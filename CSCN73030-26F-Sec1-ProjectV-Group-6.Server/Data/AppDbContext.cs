@@ -103,6 +103,8 @@ public class AppDbContext : DbContext
 
         modelBuilder.Entity<OutboxEvent>(e => e.Property(o => o.EventType).HasMaxLength(100));
 
+        SeedData.Apply(modelBuilder);
+        
         // Never cascade deletes: removing a parent row must fail, not silently delete history.
         foreach (var foreignKey in modelBuilder.Model.GetEntityTypes().SelectMany(t => t.GetForeignKeys()))
         {
