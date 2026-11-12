@@ -28,9 +28,14 @@ export default defineConfig(({ command }) => {
   const target = env.ASPNETCORE_HTTPS_PORT
     ? 'https://localhost:' + env.ASPNETCORE_HTTPS_PORT
     : env.ASPNETCORE_URLS?.split(';')[0] || 'https://localhost:7038';
+  // Top-level paths served by the Staff/HR API (see API.md). A browser navigation
+  // (Accept: text/html) to one of them is left to the React app.
+  const apiPrefixes = ['staff','departments','assignments','rosters','requisitions','credentials',
+    'security-flags','headcounts','audit','health','openapi','weatherforecast'];
+  const api = { target, secure:false, bypass:(req) => (req.headers.accept?.includes('text/html') ? '/index.html' : undefined) };
   return {
     plugins: [react()],
     resolve: { alias: { '@':fileURLToPath(new URL('./src', import.meta.url)) } },
-    server: { proxy: { '^/weatherforecast': { target, secure:false } }, port:Number(env.DEV_SERVER_PORT || 54552), ...(https ? { https } : {}) },
+    server: { proxy: { ['^/(' + apiPrefixes.join('|') + ')(/|\\?|$)']: api }, port:Number(env.DEV_SERVER_PORT || 54552), ...(https ? { https } : {}) },
   };
 });
