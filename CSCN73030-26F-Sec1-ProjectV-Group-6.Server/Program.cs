@@ -36,15 +36,21 @@ builder.Services
         // Model-binding errors (unreadable JSON, wrong types, empty body) are malformed requests: 400.
         options.InvalidModelStateResponseFactory = context =>
         {
+            // Query-string keys arrive as C# property names ("PageSize"); report them as the client
+            // sent them. JSON paths ("$.hireDate") and the empty-body key ("") are kept as they are.
+            var errors = context.ModelState
+                .Where(entry => entry.Value is { Errors.Count: > 0 })
+                .ToDictionary(
+                    entry => entry.Key.StartsWith('$') ? entry.Key : JsonNamingPolicy.CamelCase.ConvertName(entry.Key),
+                    entry => entry.Value!.Errors.Select(e => string.IsNullOrEmpty(e.ErrorMessage)
+                        ? "The value could not be read." : e.ErrorMessage).ToArray());
+            // The factory fills in 'type' and 'traceId' the same way as every other error response.
             var problem = context.HttpContext.RequestServices.GetRequiredService<ProblemDetailsFactory>()
                 .CreateValidationProblemDetails(context.HttpContext, context.ModelState,
                     StatusCodes.Status400BadRequest, "Malformed request",
                     detail: "The request could not be read. See 'errors' for details.");
-            // Query-string keys arrive as C# property names ("PageSize"); report them as the client sent them.
-            problem.Errors = problem.Errors.ToDictionary(
-                e => e.Key.StartsWith('$') ? e.Key : JsonNamingPolicy.CamelCase.ConvertName(e.Key),
-                e => e.Value);
-            return new BadRequestObjectResult(problem) { ContentTypes = { "application/problem+json" } };
+            problem.Errors = errors;
+            return new ProblemDetailsResult(problem);
         };
     });
 // The OpenAPI generator reads these options, so enums appear as strings in the document too.

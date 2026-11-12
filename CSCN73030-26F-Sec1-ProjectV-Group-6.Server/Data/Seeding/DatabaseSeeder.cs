@@ -1,3 +1,8 @@
+/**
+ * @file DatabaseSeeder.cs
+ * @brief Applies migrations and loads the fictional demo data.
+ */
+
 using CSCN73030_26F_Sec1_ProjectV_Group_6.Server.Application;
 using CSCN73030_26F_Sec1_ProjectV_Group_6.Server.Data.Repositories;
 using CSCN73030_26F_Sec1_ProjectV_Group_6.Server.Domain;
@@ -16,45 +21,62 @@ namespace CSCN73030_26F_Sec1_ProjectV_Group_6.Server.Data.Seeding;
 /// valid / expiring / expired states and the roster always covers "now".
 /// The seeder does nothing if departments already exist.
 /// </remarks>
-public class DatabaseSeeder(
-    CmesDbContext db,
-    StaffRepository staffRepository,
-    RequisitionRepository requisitionRepository,
-    Clock clock,
-    ILogger<DatabaseSeeder> logger)
+public class DatabaseSeeder
 {
+    private readonly CmesDbContext _db;
+    private readonly StaffRepository _staffRepository;
+    private readonly RequisitionRepository _requisitionRepository;
+    private readonly Clock _clock;
+    private readonly ILogger<DatabaseSeeder> _logger;
+
+    /// <summary>Creates the DatabaseSeeder. Dependencies are supplied by dependency injection.</summary>
+    /// <param name="db">Database context.</param>
+    /// <param name="staffRepository">Staff data access.</param>
+    /// <param name="requisitionRepository">Requisition data access.</param>
+    /// <param name="clock">Current UTC time.</param>
+    /// <param name="logger">Logger.</param>
+    public DatabaseSeeder(CmesDbContext db, StaffRepository staffRepository, RequisitionRepository requisitionRepository, Clock clock, ILogger<DatabaseSeeder> logger)
+    {
+        _db = db;
+        _staffRepository = staffRepository;
+        _requisitionRepository = requisitionRepository;
+        _clock = clock;
+        _logger = logger;
+    }
+
     private const string EmailDomain = "cmes.example";
 
+    /// <summary>Applies pending migrations, then seeds demo data inside one transaction. Does nothing if departments already exist.</summary>
     public async Task MigrateAndSeedAsync()
     {
-        logger.LogInformation("Applying migrations...");
-        await db.Database.MigrateAsync();
+        _logger.LogInformation("Applying migrations...");
+        await _db.Database.MigrateAsync();
 
-        if (await db.Departments.AnyAsync())
+        if (await _db.Departments.AnyAsync())
         {
-            logger.LogInformation("Database already has data; seeding skipped.");
+            _logger.LogInformation("Database already has data; seeding skipped.");
             return;
         }
 
-        await using var transaction = await db.Database.BeginTransactionAsync();
+        await using var transaction = await _db.Database.BeginTransactionAsync();
 
         var services = SeedDepartmentsAndServices();
         var types = SeedCredentialTypes();
-        await db.SaveChangesAsync();
+        await _db.SaveChangesAsync();
 
         var staff = await SeedStaffAsync(services);
-        await db.SaveChangesAsync();
+        await _db.SaveChangesAsync();
 
         SeedCredentials(staff, types);
         SeedParamedicRoster(staff, services["Paramedic Service"]);
         await SeedRequisitionsAsync();
-        await db.SaveChangesAsync();
+        await _db.SaveChangesAsync();
 
         await transaction.CommitAsync();
-        logger.LogInformation("Seeded {Departments} departments, {Staff} staff, {Roster} roster entries, " +
+        _logger.LogInformation("Seeded {Departments} departments, {Staff} staff, {Roster} roster entries, " +
                               "{Requisitions} requisitions and {Credentials} credentials.",
-            await db.Departments.CountAsync(), await db.Staff.CountAsync(), await db.RosterEntries.CountAsync(),
-            await db.Requisitions.CountAsync(), await db.Credentials.CountAsync());
+            await _db.Departments.CountAsync(), await _db.Staff.CountAsync(), await _db.RosterEntries.CountAsync(),
+            await _db.Requisitions.CountAsync(), await _db.Credentials.CountAsync());
     }
 
     // ---- Departments and services ----------------------------------------------------------
@@ -82,7 +104,7 @@ public class DatabaseSeeder(
                 department.Services.Add(service);
                 byName[serviceName] = service;
             }
-            db.Departments.Add(department);
+            _db.Departments.Add(department);
         }
         return byName;
     }
@@ -109,7 +131,7 @@ public class DatabaseSeeder(
         foreach (var (name, blocking) in types)
         {
             var type = new CredentialType { Name = name, IsDutyBlocking = blocking };
-            db.CredentialTypes.Add(type);
+            _db.CredentialTypes.Add(type);
             byName[name] = type;
         }
         return byName;
@@ -154,7 +176,7 @@ public class DatabaseSeeder(
 
     private async Task<Dictionary<string, Staff>> SeedStaffAsync(Dictionary<string, Service> services)
     {
-        var today = clock.Today;
+        var today = _clock.Today;
         var byKey = new Dictionary<string, Staff>();
 
         for (var i = 0; i < People.Length; i++)
@@ -165,7 +187,7 @@ public class DatabaseSeeder(
 
             var staff = new Staff
             {
-                StaffNumber = await staffRepository.NextStaffNumberAsync(),
+                StaffNumber = await _staffRepository.NextStaffNumberAsync(),
                 FirstName = p.First,
                 LastName = p.Last,
                 PreferredName = p.Preferred,
@@ -184,7 +206,7 @@ public class DatabaseSeeder(
                 assignment.EndDate = today.AddMonths(-2);
             staff.Assignments.Add(assignment);
 
-            db.Staff.Add(staff);
+            _db.Staff.Add(staff);
             byKey[p.Key] = staff;
         }
 
@@ -215,7 +237,7 @@ public class DatabaseSeeder(
 
     private void SeedCredentials(Dictionary<string, Staff> staff, Dictionary<string, CredentialType> types)
     {
-        var today = clock.Today;
+        var today = _clock.Today;
         var serial = 1000;
 
         // expiresInDays: negative = already expired; 0-30 = expiring; above 30 = valid.
@@ -233,7 +255,7 @@ public class DatabaseSeeder(
             credential.Status = suspended
                 ? CredentialStatus.Suspended
                 : CredentialStatusRules.Derive(CredentialStatus.Valid, expiry, today);
-            db.Credentials.Add(credential);
+            _db.Credentials.Add(credential);
         }
 
         Add("talia", "Advanced Care Paramedic Licence", 410);
@@ -275,8 +297,8 @@ public class DatabaseSeeder(
     private void SeedParamedicRoster(Dictionary<string, Staff> staff, Service paramedics)
     {
         string[][] crews = [["desmond", "priya"], ["jonah", "kofi"], ["talia", "ines"]];
-        var now = clock.UtcNow;
-        var today = clock.Today;
+        var now = _clock.UtcNow;
+        var today = _clock.Today;
 
         for (var offset = -1; offset <= 5; offset++)
         {
@@ -299,11 +321,11 @@ public class DatabaseSeeder(
                 : start <= now.AddHours(48) ? RosterStatus.Confirmed
                 : RosterStatus.Scheduled;
 
-            // One cancelled shift so the UI can show that state.
-            if (person.FirstName == "Kofi" && start.Date == today.AddDays(3).ToDateTime(TimeOnly.MinValue).Date)
+            // One cancelled shift (Kofi, day shift 4 days ahead) so the UI can show that state.
+            if (person.FirstName == "Kofi" && start.Date == today.AddDays(4).ToDateTime(TimeOnly.MinValue).Date)
                 status = RosterStatus.Cancelled;
 
-            db.RosterEntries.Add(new RosterEntry
+            _db.RosterEntries.Add(new RosterEntry
             {
                 Staff = person,
                 Service = paramedics,
@@ -321,8 +343,8 @@ public class DatabaseSeeder(
 
     private async Task SeedRequisitionsAsync()
     {
-        var departments = await db.Departments.ToDictionaryAsync(d => d.Code);
-        var now = clock.UtcNow;
+        var departments = await _db.Departments.ToDictionaryAsync(d => d.Code);
+        var now = _clock.UtcNow;
 
         var requisitions = new (string Dept, string Role, int Positions, int Filled, RequisitionStatus Status,
             BudgetDecision? Budget, string Reason, int DaysAgo)[]
@@ -338,9 +360,9 @@ public class DatabaseSeeder(
         var index = 1;
         foreach (var r in requisitions.OrderByDescending(r => r.DaysAgo))
         {
-            db.Requisitions.Add(new Requisition
+            _db.Requisitions.Add(new Requisition
             {
-                RequisitionNumber = await requisitionRepository.NextRequisitionNumberAsync(),
+                RequisitionNumber = await _requisitionRepository.NextRequisitionNumberAsync(),
                 RequestingDepartment = departments[r.Dept],
                 Type = RequisitionType.Hire,
                 RoleTitle = r.Role,
