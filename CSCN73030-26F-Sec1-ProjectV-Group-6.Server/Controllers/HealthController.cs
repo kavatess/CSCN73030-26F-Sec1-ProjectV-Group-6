@@ -28,8 +28,8 @@ public class HealthController : ControllerBase
         _healthCheckService = healthCheckService;
     }
 
-    /// <summary>Liveness and database connectivity.</summary>
-    /// <remarks>200 when the service and its database are reachable; 503 when the database is unreachable.</remarks>
+    /// <summary>Liveness, database connectivity and the integration-event backlog.</summary>
+    /// <remarks>200 when Healthy or Degraded (e.g. integration events waiting more than 5 minutes); 503 when the database is unreachable.</remarks>
     [HttpGet]
     [ProducesResponseType<HealthDto>(StatusCodes.Status200OK)]
     [ProducesResponseType<HealthDto>(StatusCodes.Status503ServiceUnavailable)]
@@ -40,8 +40,9 @@ public class HealthController : ControllerBase
             report.Status.ToString(),
             report.Entries.ToDictionary(e => e.Key, e => e.Value.Status.ToString()));
 
-        return report.Status == HealthStatus.Healthy
-            ? Ok(body)
-            : StatusCode(StatusCodes.Status503ServiceUnavailable, body);
+        // Degraded (e.g. events waiting to be published) still serves requests, so it stays 200.
+        return report.Status == HealthStatus.Unhealthy
+            ? StatusCode(StatusCodes.Status503ServiceUnavailable, body)
+            : Ok(body);
     }
 }

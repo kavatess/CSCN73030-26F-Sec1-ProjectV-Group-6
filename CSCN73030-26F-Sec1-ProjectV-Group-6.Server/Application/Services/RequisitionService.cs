@@ -22,6 +22,7 @@ public class RequisitionService
     private readonly StaffRepository _staffRepository;
     private readonly TerminationService _terminationService;
     private readonly ICurrentUser _currentUser;
+    private readonly Infrastructure.Observability.StaffHrMetrics _metrics;
 
     /// <summary>Creates the RequisitionService. Dependencies are supplied by dependency injection.</summary>
     /// <param name="requisitionRepository">Requisition data access.</param>
@@ -30,9 +31,12 @@ public class RequisitionService
     /// <param name="staffRepository">Staff lookups for termination requisitions.</param>
     /// <param name="terminationService">Carries out completed terminations.</param>
     /// <param name="currentUser">The caller, for department scoping.</param>
+    /// <param name="metrics">Business counters.</param>
     public RequisitionService(RequisitionRepository requisitionRepository, DepartmentRepository departmentRepository, Clock clock,
-        StaffRepository staffRepository, TerminationService terminationService, ICurrentUser currentUser)
+        StaffRepository staffRepository, TerminationService terminationService, ICurrentUser currentUser,
+        Infrastructure.Observability.StaffHrMetrics metrics)
     {
+        _metrics = metrics;
         _currentUser = currentUser;
         _staffRepository = staffRepository;
         _terminationService = terminationService;
@@ -189,6 +193,7 @@ public class RequisitionService
             await _terminationService.ApplyAsync(requisition);
 
         await _requisitionRepository.SaveChangesAsync();
+        if (carriesOutTermination) _metrics.StaffTerminated(requisition.Staff!.HomeDepartment.Code);
         return requisition.ToDto();
     }
 

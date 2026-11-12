@@ -19,14 +19,18 @@ public class StaffService
     private readonly DepartmentRepository _departmentRepository;
     private readonly Clock _clock;
     private readonly OutboxWriter _outbox;
+    private readonly Infrastructure.Observability.StaffHrMetrics _metrics;
 
     /// <summary>Creates the StaffService. Dependencies are supplied by dependency injection.</summary>
     /// <param name="staffRepository">Staff data access.</param>
     /// <param name="departmentRepository">Department and service data access.</param>
     /// <param name="clock">Current UTC time.</param>
     /// <param name="outbox">Queues integration events in the same transaction.</param>
-    public StaffService(StaffRepository staffRepository, DepartmentRepository departmentRepository, Clock clock, OutboxWriter outbox)
+    /// <param name="metrics">Business counters.</param>
+    public StaffService(StaffRepository staffRepository, DepartmentRepository departmentRepository, Clock clock, OutboxWriter outbox,
+        Infrastructure.Observability.StaffHrMetrics metrics)
     {
+        _metrics = metrics;
         _outbox = outbox;
         _staffRepository = staffRepository;
         _departmentRepository = departmentRepository;
@@ -130,6 +134,7 @@ public class StaffService
             service?.ServiceId, staff.Assignments.FirstOrDefault()?.RoleTitle));
         await _staffRepository.SaveChangesAsync();
         await transaction.CommitAsync();
+        _metrics.StaffOnboarded(department.Code);
 
         return await GetProfileAsync(staff.StaffNumber);
     }

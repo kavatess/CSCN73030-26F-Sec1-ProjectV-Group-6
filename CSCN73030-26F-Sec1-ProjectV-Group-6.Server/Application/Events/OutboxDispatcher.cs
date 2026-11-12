@@ -21,14 +21,18 @@ public class OutboxDispatcher
     private readonly IEventPublisher _publisher;
     private readonly Clock _clock;
     private readonly ILogger<OutboxDispatcher> _logger;
+    private readonly Infrastructure.Observability.StaffHrMetrics _metrics;
 
     /// <summary>Creates the dispatcher.</summary>
     /// <param name="outboxRepository">Outbox data access.</param>
     /// <param name="publisher">Delivers events (Service Bus or log).</param>
     /// <param name="clock">Current UTC time.</param>
     /// <param name="logger">Logger.</param>
-    public OutboxDispatcher(OutboxRepository outboxRepository, IEventPublisher publisher, Clock clock, ILogger<OutboxDispatcher> logger)
+    /// <param name="metrics">Business counters.</param>
+    public OutboxDispatcher(OutboxRepository outboxRepository, IEventPublisher publisher, Clock clock, ILogger<OutboxDispatcher> logger,
+        Infrastructure.Observability.StaffHrMetrics metrics)
     {
+        _metrics = metrics;
         _outboxRepository = outboxRepository;
         _publisher = publisher;
         _clock = clock;
@@ -50,11 +54,13 @@ public class OutboxDispatcher
             }
             catch (Exception ex) when (ex is not OperationCanceledException)
             {
+                _metrics.EventPublishFailed(outboxEvent.EventType);
                 _logger.LogWarning(ex, "Publishing {EventType} {EventId} failed; it will be retried.",
                     outboxEvent.EventType, outboxEvent.EventId);
                 break;
             }
             outboxEvent.PublishedAtUtc = _clock.UtcNow;
+            _metrics.EventPublished(outboxEvent.EventType);
             published++;
         }
 

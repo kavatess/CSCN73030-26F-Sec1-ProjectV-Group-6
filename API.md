@@ -113,11 +113,14 @@ or `null` if they hold none. `daysUntilExpiry` is negative once expired.
 
 ### `GET /health`
 
-`200` when the database is reachable, `503` when it isn't.
+No token needed. `200` when Healthy or Degraded, `503` when Unhealthy (database unreachable).
 
 ```json
-{ "status": "Healthy", "checks": { "database": "Healthy" } }
+{ "status": "Healthy", "checks": { "database": "Healthy", "outbox": "Healthy" } }
 ```
+
+`outbox` is `Degraded` when an integration event has waited more than 5 minutes to be published (usually Service
+Bus unreachable): the API still works, but peer services hear about changes late.
 
 ## Staff
 

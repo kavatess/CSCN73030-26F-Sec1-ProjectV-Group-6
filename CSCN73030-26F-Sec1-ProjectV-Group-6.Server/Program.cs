@@ -20,11 +20,16 @@ using CSCN73030_26F_Sec1_ProjectV_Group_6.Server.Data.Seeding;
 using CSCN73030_26F_Sec1_ProjectV_Group_6.Server.Infrastructure;
 using CSCN73030_26F_Sec1_ProjectV_Group_6.Server.Infrastructure.Auth;
 using CSCN73030_26F_Sec1_ProjectV_Group_6.Server.Infrastructure.Messaging;
+using CSCN73030_26F_Sec1_ProjectV_Group_6.Server.Infrastructure.Observability;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.Infrastructure;
 using Microsoft.EntityFrameworkCore;
 
 var builder = WebApplication.CreateBuilder(args);
+
+// ---- Cloud configuration and telemetry (both off unless configured) -------------------------
+builder.AddKeyVaultIfConfigured();
+builder.AddStaffHrTelemetry();
 
 // ---- MVC + JSON -----------------------------------------------------------------------------
 builder.Services
@@ -86,7 +91,9 @@ builder.Services.AddScoped<AuditInterceptor>();
 builder.Services.AddDbContext<CmesDbContext>((services, options) => options
     .UseSqlServer(builder.Configuration.GetConnectionString("StaffHr"))
     .AddInterceptors(services.GetRequiredService<AuditInterceptor>()));
-builder.Services.AddHealthChecks().AddDbContextCheck<CmesDbContext>("database");
+builder.Services.AddHealthChecks()
+    .AddDbContextCheck<CmesDbContext>("database")
+    .AddCheck<OutboxHealthCheck>("outbox");
 
 // ---- Application layers ---------------------------------------------------------------------
 builder.Services.AddSingleton(TimeProvider.System);
