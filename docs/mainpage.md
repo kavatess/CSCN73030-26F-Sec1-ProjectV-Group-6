@@ -40,16 +40,20 @@ digraph arch {
     rankdir=LR;
     node [shape=box, style=rounded, fontname=Helvetica, fontsize=10];
     browser [label="Browser"];
-    client [label="React client\n(App.jsx)"];
-    api [label="ASP.NET Core API\n(Program.cs)"];
-    ctrl [label="Controllers"];
-    model [label="Models"];
+    client [label="React client"];
+    ctrl [label="Controllers\n+ Contracts (DTOs)"];
+    svc [label="Application services\n(rules, validation)"];
+    repo [label="Repositories\n(EF Core)"];
+    db [label="SQL Server"];
     browser -> client [label="loads"];
-    client -> api [label="fetch(JSON)"];
-    api -> ctrl [label="routes"];
-    ctrl -> model [label="returns"];
+    client -> ctrl [label="fetch(JSON)"];
+    ctrl -> svc [label="calls"];
+    svc -> repo [label="reads / writes"];
+    repo -> db [label="SQL"];
 }
 \enddot
+
+The server's layers, folders and business rules are described in @ref backend "Backend features and structure".
 
 During development the server starts the Vite dev server through SpaProxy. The client calls the API
 with a relative URL, so the same code works behind the Vite proxy and when served by ASP.NET.
@@ -57,9 +61,10 @@ with a relative URL, so the same code works behind the Vite proxy and when serve
 ## Current state
 
 The Staff/HR backend implements staff, departments and services, assignments, duty rosters,
-hire requisitions and credentials on SQL Server through EF Core. See `README.md` for how to migrate, seed and
-run it, and `API.md` for the endpoint contract. The template's weather-forecast sample is still present
-because the existing regression tests cover it.
+hire requisitions and credentials on SQL Server through EF Core: see @ref backend "Backend features and structure".
+`README.md` explains how to migrate, seed and run it, and `API.md` is the endpoint contract for other groups.
+The template's weather-forecast sample is still present because its original regression tests cover it.
+Every backend feature has regression tests: see @ref REGRESSION_TESTING.md "Regression testing".
 
 ## Requirements
 

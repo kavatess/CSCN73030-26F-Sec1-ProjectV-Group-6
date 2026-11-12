@@ -1,3 +1,8 @@
+/**
+ * @file StaffService.cs
+ * @brief Business logic for creating, reading, updating and searching staff.
+ */
+
 using CSCN73030_26F_Sec1_ProjectV_Group_6.Server.Application.Errors;
 using CSCN73030_26F_Sec1_ProjectV_Group_6.Server.Application.Validation;
 using CSCN73030_26F_Sec1_ProjectV_Group_6.Server.Contracts;
@@ -7,18 +12,37 @@ using CSCN73030_26F_Sec1_ProjectV_Group_6.Server.Domain;
 namespace CSCN73030_26F_Sec1_ProjectV_Group_6.Server.Application.Services;
 
 /// <summary>Create, read, update and search employees.</summary>
-public class StaffService(
-    StaffRepository staffRepository,
-    DepartmentRepository departmentRepository,
-    Clock clock)
+public class StaffService
 {
+    private readonly StaffRepository _staffRepository;
+    private readonly DepartmentRepository _departmentRepository;
+    private readonly Clock _clock;
+
+    /// <summary>Creates the StaffService. Dependencies are supplied by dependency injection.</summary>
+    /// <param name="staffRepository">Staff data access.</param>
+    /// <param name="departmentRepository">Department and service data access.</param>
+    /// <param name="clock">Current UTC time.</param>
+    public StaffService(StaffRepository staffRepository, DepartmentRepository departmentRepository, Clock clock)
+    {
+        _staffRepository = staffRepository;
+        _departmentRepository = departmentRepository;
+        _clock = clock;
+    }
+
     private const int MinimumAgeAtHire = 16;
+    /// <summary>Largest page size a search accepts.</summary>
     public const int MaxPageSize = 100;
 
     /// <summary>
     /// Creates an employee and issues a staff number. The number is taken from the sequence and the
     /// Staff row (plus optional first assignment) is inserted inside one transaction (business rule 1).
     /// </summary>
+    /// <param name="request">The onboarding form.</param>
+    /// <returns>The new employee's profile.</returns>
+    /// <exception cref="Errors.ValidationFailedException">A field breaks a rule (422).</exception>
+    /// <exception cref="Errors.ConflictException">The work email is already in use (409).</exception>
+    /// @par Business rules 1 and 2
+    /// The staff number comes from the sequence inside the same transaction as the insert; a duplicate email is 409.
     public async Task<StaffProfileDto> CreateAsync(CreateStaffRequest request)
     {
         var errors = new ValidationErrors();
@@ -39,7 +63,7 @@ public class StaffService(
 
         var department = string.IsNullOrWhiteSpace(request.HomeDepartmentCode)
             ? null
-            : await departmentRepository.GetByCodeAsync(request.HomeDepartmentCode);
+            : await _departmentRepository.GetByCodeAsync(request.HomeDepartmentCode);
         errors.AddIf(department == null && !string.IsNullOrWhiteSpace(request.HomeDepartmentCode),
             "homeDepartmentCode", $"Unknown department code '{request.HomeDepartmentCode}'.");
 
@@ -51,10 +75,10 @@ public class StaffService(
             errors.Required("initialAssignment.roleTitle", first.RoleTitle);
             if (first.ServiceId != null)
             {
-                service = await departmentRepository.GetServiceAsync(first.ServiceId.Value);
+                service = await _departmentRepository.GetServiceAsync(first.ServiceId.Value);
                 errors.AddIf(service == null, "initialAssignment.serviceId", $"Unknown service id {first.ServiceId}.");
             }
-            var start = first.StartDate ?? request.HireDate ?? clock.Today;
+            var start = first.StartDate ?? request.HireDate ?? _clock.Today;
             errors.AddIf(first.EndDate != null && first.EndDate <= start,
                 "initialAssignment.endDate", "EndDate must be after StartDate.");
         }
@@ -62,14 +86,14 @@ public class StaffService(
         errors.ThrowIfAny();
 
         var email = Text.NormaliseEmail(request.Email!);
-        if (await staffRepository.EmailInUseAsync(email))
+        if (await _staffRepository.EmailInUseAsync(email))
             throw new ConflictException($"The work email '{email}' is already in use by another employee.");
 
-        await using var transaction = await staffRepository.BeginTransactionAsync();
+        await using var transaction = await _staffRepository.BeginTransactionAsync();
 
         var staff = new Staff
         {
-            StaffNumber = await staffRepository.NextStaffNumberAsync(),
+            StaffNumber = await _staffRepository.NextStaffNumberAsync(),
             FirstName = request.FirstName!.Trim(),
             LastName = request.LastName!.Trim(),
             PreferredName = Text.TrimToNull(request.PreferredName),
@@ -94,24 +118,35 @@ public class StaffService(
             });
         }
 
-        staffRepository.Add(staff);
-        await staffRepository.SaveChangesAsync();
+        _staffRepository.Add(staff);
+        await _staffRepository.SaveChangesAsync();
         await transaction.CommitAsync();
 
         return await GetProfileAsync(staff.StaffNumber);
     }
 
+    /// <summary>Loads one employee's full profile.</summary>
+    /// <param name="staffNumber">STF-0000000.</param>
+    /// <exception cref="Errors.NotFoundException">The staff member does not exist.</exception>
     public async Task<StaffProfileDto> GetProfileAsync(string staffNumber)
     {
-        var staff = await staffRepository.GetByNumberAsync(staffNumber, withDetails: true)
+        var staff = await _staffRepository.GetByNumberAsync(staffNumber, withDetails: true)
                     ?? throw new NotFoundException("Staff", staffNumber);
-        return staff.ToProfile(clock.Today);
+        return staff.ToProfile(_clock.Today);
     }
 
     /// <summary>Partial update. Null fields are left unchanged; the staff number can never change.</summary>
+    /// <param name="staffNumber">Employee to update.</param>
+    /// <param name="request">Fields to change.</param>
+    /// <returns>The updated profile.</returns>
+    /// <exception cref="Errors.NotFoundException">The staff member does not exist.</exception>
+    /// <exception cref="Errors.ValidationFailedException">A field breaks a rule (422).</exception>
+    /// <exception cref="Errors.ConflictException">The new email is already in use (409).</exception>
+    /// @par Business rules 1 and 2
+    /// A different staffNumber in the body is 422; an email already in use is 409.
     public async Task<StaffProfileDto> UpdateAsync(string staffNumber, UpdateStaffRequest request)
     {
-        var staff = await staffRepository.GetByNumberAsync(staffNumber)
+        var staff = await _staffRepository.GetByNumberAsync(staffNumber)
                     ?? throw new NotFoundException("Staff", staffNumber);
 
         var errors = new ValidationErrors();
@@ -132,7 +167,7 @@ public class StaffService(
         Department? newDepartment = null;
         if (request.HomeDepartmentCode != null)
         {
-            newDepartment = await departmentRepository.GetByCodeAsync(request.HomeDepartmentCode);
+            newDepartment = await _departmentRepository.GetByCodeAsync(request.HomeDepartmentCode);
             errors.AddIf(newDepartment == null, "homeDepartmentCode", $"Unknown department code '{request.HomeDepartmentCode}'.");
         }
 
@@ -141,7 +176,7 @@ public class StaffService(
         if (request.Email != null)
         {
             var email = Text.NormaliseEmail(request.Email);
-            if (email != staff.Email && await staffRepository.EmailInUseAsync(email, staff.StaffId))
+            if (email != staff.Email && await _staffRepository.EmailInUseAsync(email, staff.StaffId))
                 throw new ConflictException($"The work email '{email}' is already in use by another employee.");
             staff.Email = email;
         }
@@ -158,10 +193,13 @@ public class StaffService(
         // A transfer changes the home department only; the staff number stays the same.
         if (newDepartment != null) staff.HomeDepartmentId = newDepartment.DepartmentId;
 
-        await staffRepository.SaveChangesAsync();
+        await _staffRepository.SaveChangesAsync();
         return await GetProfileAsync(staff.StaffNumber);
     }
 
+    /// <summary>Searches the staff directory.</summary>
+    /// <param name="query">Filters and paging.</param>
+    /// <exception cref="Errors.ValidationFailedException">A field breaks a rule (422).</exception>
     public async Task<PagedResult<StaffSummaryDto>> SearchAsync(StaffSearchQuery query)
     {
         var errors = new ValidationErrors();
@@ -170,14 +208,14 @@ public class StaffService(
         int? departmentId = null;
         if (!string.IsNullOrWhiteSpace(query.Department))
         {
-            var department = await departmentRepository.GetByCodeAsync(query.Department);
+            var department = await _departmentRepository.GetByCodeAsync(query.Department);
             errors.AddIf(department == null, "department", $"Unknown department code '{query.Department}'.");
             departmentId = department?.DepartmentId;
         }
         errors.ThrowIfAny();
 
-        var today = clock.Today;
-        var (items, total) = await staffRepository.SearchAsync(
+        var today = _clock.Today;
+        var (items, total) = await _staffRepository.SearchAsync(
             new StaffSearchCriteria(query.Q, departmentId, query.Service, query.Role, query.Status,
                 query.CredentialState, query.Page, query.PageSize),
             today);
@@ -186,6 +224,10 @@ public class StaffService(
             items.Select(s => s.ToSummary(today)).ToList(), query.Page, query.PageSize, total);
     }
 
+    /// <summary>Checks page is at least 1 and pageSize is 1 to <see cref="MaxPageSize"/>.</summary>
+    /// <param name="errors">Collector to add errors to.</param>
+    /// <param name="page">Requested page.</param>
+    /// <param name="pageSize">Requested page size.</param>
     public static void ValidatePaging(ValidationErrors errors, int page, int pageSize)
     {
         errors.AddIf(page < 1, "page", "Page must be 1 or more.");
@@ -195,7 +237,7 @@ public class StaffService(
     private void ValidateBirthAndHireDates(ValidationErrors errors, DateOnly? dateOfBirth, DateOnly? hireDate)
     {
         if (dateOfBirth != null)
-            errors.AddIf(dateOfBirth >= clock.Today, "dateOfBirth", "Date of birth must be in the past.");
+            errors.AddIf(dateOfBirth >= _clock.Today, "dateOfBirth", "Date of birth must be in the past.");
         if (dateOfBirth != null && hireDate != null)
             errors.AddIf(hireDate < dateOfBirth.Value.AddYears(MinimumAgeAtHire), "hireDate",
                 $"Hire date must be at least {MinimumAgeAtHire} years after date of birth.");

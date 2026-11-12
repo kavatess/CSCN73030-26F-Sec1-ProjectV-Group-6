@@ -1,3 +1,8 @@
+/**
+ * @file RequisitionWorkflow.cs
+ * @brief Allowed requisition status transitions.
+ */
+
 namespace CSCN73030_26F_Sec1_ProjectV_Group_6.Server.Domain;
 
 /// <summary>
@@ -22,7 +27,12 @@ public static class RequisitionWorkflow
         [RequisitionStatus.Closed] = [],
     };
 
+    /// <summary>True when a requisition in status <paramref name="from"/> may move to <paramref name="to"/>.</summary>
+    /// <param name="from">Current status.</param>
+    /// <param name="to">Requested status.</param>
     public static bool CanMove(RequisitionStatus from, RequisitionStatus to) => Allowed[from].Contains(to);
 
+    /// <summary>The statuses a requisition in <paramref name="from"/> may move to; empty for final statuses.</summary>
+    /// <param name="from">Current status.</param>
     public static IReadOnlyList<RequisitionStatus> NextStatuses(RequisitionStatus from) => Allowed[from];
 }

@@ -9,11 +9,13 @@ OUTPUT_DIRECTORY       = docs/doxygen
 INPUT                  = CSCN73030-26F-Sec1-ProjectV-Group-6.Server \
                          cscn73030-26f-sec1-projectv-group-6.client/src \
                          docs/mainpage.md \
+                         docs/BACKEND.md \
                          docs/REGRESSION_TESTING.md
 RECURSIVE              = YES
 FILE_PATTERNS          = *.cs *.js *.jsx *.md
 EXCLUDE_PATTERNS       = */bin/* \
                          */obj/* \
+                         */Migrations/* \
                          */node_modules/* \
                          */Properties/* \
                          */src/test/* \

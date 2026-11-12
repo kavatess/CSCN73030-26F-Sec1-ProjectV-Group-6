@@ -1,3 +1,8 @@
+/**
+ * @file Text.cs
+ * @brief String helpers for copying request values onto entities.
+ */
+
 namespace CSCN73030_26F_Sec1_ProjectV_Group_6.Server.Application.Validation;
 
 /// <summary>Small string helpers used when copying request values onto entities.</summary>

@@ -1,3 +1,8 @@
+/**
+ * @file ProblemExamplesTransformer.cs
+ * @brief Adds RFC 7807 example bodies to error responses in the OpenAPI document.
+ */
+
 using System.Text.Json.Nodes;
 using Microsoft.AspNetCore.OpenApi;
 using Microsoft.OpenApi;
@@ -23,6 +28,10 @@ public class ProblemExamplesTransformer : IOpenApiOperationTransformer
             "Validation failure. 'errors' maps each invalid field to its messages."),
     };
 
+    /// <summary>Adds descriptions and examples for every declared error response, and marks the Idempotency-Key header required.</summary>
+    /// <param name="operation">The operation being generated.</param>
+    /// <param name="context">Generator context.</param>
+    /// <param name="ct">Cancellation token.</param>
     public Task TransformAsync(OpenApiOperation operation, OpenApiOperationTransformerContext context, CancellationToken ct)
     {
         var declared = context.Description.ActionDescriptor.EndpointMetadata.OfType<ProblemResponseAttribute>();

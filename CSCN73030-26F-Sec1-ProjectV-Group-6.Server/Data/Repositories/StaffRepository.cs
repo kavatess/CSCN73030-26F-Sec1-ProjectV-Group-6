@@ -1,3 +1,8 @@
+/**
+ * @file StaffRepository.cs
+ * @brief Database access for staff.
+ */
+
 using CSCN73030_26F_Sec1_ProjectV_Group_6.Server.Domain;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Storage;
@@ -5,6 +10,14 @@ using Microsoft.EntityFrameworkCore.Storage;
 namespace CSCN73030_26F_Sec1_ProjectV_Group_6.Server.Data.Repositories;
 
 /// <summary>Filters for <see cref="StaffRepository.SearchAsync"/>. Null means "don't filter".</summary>
+/// <param name="Text">Free text matched against number, names and email.</param>
+/// <param name="DepartmentId">Home department key.</param>
+/// <param name="ServiceId">Service of a current assignment.</param>
+/// <param name="Role">Text in a current role title.</param>
+/// <param name="Status">Employment status.</param>
+/// <param name="CredentialState">Derived credential state the person must hold.</param>
+/// <param name="Page">1-based page.</param>
+/// <param name="PageSize">Rows per page.</param>
 public record StaffSearchCriteria(
     string? Text,
     int? DepartmentId,
@@ -15,12 +28,22 @@ public record StaffSearchCriteria(
     int Page,
     int PageSize);
 
-public class StaffRepository(CmesDbContext db)
+/// <summary>EF Core queries and writes for <see cref="Staff"/>.</summary>
+public class StaffRepository
 {
+    private readonly CmesDbContext _db;
+
+    /// <summary>Creates the StaffRepository. Dependencies are supplied by dependency injection.</summary>
+    /// <param name="db">Database context.</param>
+    public StaffRepository(CmesDbContext db)
+    {
+        _db = db;
+    }
+
     /// <summary>Finds a staff member by staff number. With details, loads assignments and credentials too.</summary>
     public Task<Staff?> GetByNumberAsync(string staffNumber, bool withDetails = false)
     {
-        IQueryable<Staff> query = db.Staff.Include(s => s.HomeDepartment);
+        IQueryable<Staff> query = _db.Staff.Include(s => s.HomeDepartment);
         if (withDetails)
         {
             query = query
@@ -31,8 +54,11 @@ public class StaffRepository(CmesDbContext db)
         return query.SingleOrDefaultAsync(s => s.StaffNumber == staffNumber);
     }
 
+    /// <summary>True when another staff member already uses this email (rule 2).</summary>
+    /// <param name="normalisedEmail">Lower-case, trimmed email.</param>
+    /// <param name="exceptStaffId">Staff member to ignore (the one being updated).</param>
     public Task<bool> EmailInUseAsync(string normalisedEmail, int? exceptStaffId = null) =>
-        db.Staff.AnyAsync(s => s.Email == normalisedEmail && s.StaffId != exceptStaffId);
+        _db.Staff.AnyAsync(s => s.Email == normalisedEmail && s.StaffId != exceptStaffId);
 
     /// <summary>
     /// Takes the next value from the city-wide staff number sequence. SQL Server sequences never
@@ -42,15 +68,19 @@ public class StaffRepository(CmesDbContext db)
     {
         // ToListAsync (not SingleAsync) so EF doesn't wrap the SQL in a subquery:
         // NEXT VALUE FOR is not allowed inside a derived table.
-        var values = await db.Database
+        var values = await _db.Database
             .SqlQueryRaw<long>($"SELECT NEXT VALUE FOR dbo.{CmesDbContext.StaffNumberSequence} AS [Value]")
             .ToListAsync();
         return StaffNumber.Format(values.Single());
     }
 
+    /// <summary>Filters, counts and pages staff for the directory, loading department, assignments and credentials.</summary>
+    /// <param name="criteria">Filters and paging.</param>
+    /// <param name="today">Today (UTC), for current assignments and credential states.</param>
+    /// <returns>The page of staff and the total matching count.</returns>
     public async Task<(List<Staff> Items, int Total)> SearchAsync(StaffSearchCriteria criteria, DateOnly today)
     {
-        IQueryable<Staff> query = db.Staff;
+        IQueryable<Staff> query = _db.Staff;
 
         if (!string.IsNullOrWhiteSpace(criteria.Text))
         {
@@ -87,7 +117,7 @@ public class StaffRepository(CmesDbContext db)
         if (criteria.CredentialState != null)
         {
             var inState = CredentialStatusRules.IsInState(criteria.CredentialState.Value, today);
-            query = query.Where(s => db.Credentials.Where(inState).Any(c => c.StaffId == s.StaffId));
+            query = query.Where(s => _db.Credentials.Where(inState).Any(c => c.StaffId == s.StaffId));
         }
 
         var total = await query.CountAsync();
@@ -105,9 +135,13 @@ public class StaffRepository(CmesDbContext db)
         return (items, total);
     }
 
-    public void Add(Staff staff) => db.Staff.Add(staff);
+    /// <summary>Adds a new staff member to be inserted on the next save.</summary>
+    /// <param name="staff">The new staff member.</param>
+    public void Add(Staff staff) => _db.Staff.Add(staff);
 
-    public Task<IDbContextTransaction> BeginTransactionAsync() => db.Database.BeginTransactionAsync();
+    /// <summary>Starts a transaction, so a staff number and its Staff row are saved together (rule 1).</summary>
+    public Task<IDbContextTransaction> BeginTransactionAsync() => _db.Database.BeginTransactionAsync();
 
-    public Task SaveChangesAsync() => db.SaveChangesAsync();
+    /// <summary>Saves pending changes to the database.</summary>
+    public Task SaveChangesAsync() => _db.SaveChangesAsync();
 }

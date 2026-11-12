@@ -1,3 +1,8 @@
+/**
+ * @file ValidationErrors.cs
+ * @brief Collects field-level validation errors for a 422 response.
+ */
+
 using System.Net.Mail;
 using CSCN73030_26F_Sec1_ProjectV_Group_6.Server.Application.Errors;
 
@@ -16,8 +21,12 @@ public class ValidationErrors
 {
     private readonly Dictionary<string, List<string>> _errors = new();
 
+    /// <summary>True once any error has been added.</summary>
     public bool HasErrors => _errors.Count > 0;
 
+    /// <summary>Adds a message for a field.</summary>
+    /// <param name="field">Field name, camelCase as the client sent it.</param>
+    /// <param name="message">What is wrong.</param>
     public void Add(string field, string message)
     {
         if (!_errors.TryGetValue(field, out var list))
@@ -41,11 +50,19 @@ public class ValidationErrors
         else MaxLength(field, value, maxLength);
     }
 
+    /// <summary>Adds "This field is required." when a value-type field is missing.</summary>
+    /// <typeparam name="T">Value type, e.g. int or DateOnly.</typeparam>
+    /// <param name="field">Field name.</param>
+    /// <param name="value">Value from the request.</param>
     public void Required<T>(string field, T? value) where T : struct
     {
         if (value == null) Add(field, "This field is required.");
     }
 
+    /// <summary>Adds an error when the trimmed value is longer than the limit; null is fine.</summary>
+    /// <param name="field">Field name.</param>
+    /// <param name="value">Value from the request.</param>
+    /// <param name="maxLength">Maximum characters.</param>
     public void MaxLength(string field, string? value, int maxLength)
     {
         if (value != null && value.Trim().Length > maxLength)
@@ -59,6 +76,9 @@ public class ValidationErrors
         Required(field, value, maxLength);
     }
 
+    /// <summary>Adds an error when a non-blank value is not a single valid email address.</summary>
+    /// <param name="field">Field name.</param>
+    /// <param name="value">Value from the request.</param>
     public void Email(string field, string? value)
     {
         if (string.IsNullOrWhiteSpace(value)) return;
@@ -67,6 +87,8 @@ public class ValidationErrors
             Add(field, "Must be a valid email address.");
     }
 
+    /// <summary>Throws one <see cref="Errors.ValidationFailedException"/> with every collected error, if there are any.</summary>
+    /// <exception cref="Errors.ValidationFailedException">At least one error was added.</exception>
     public void ThrowIfAny()
     {
         if (HasErrors)

@@ -1,3 +1,8 @@
+/**
+ * @file RequestSchemaTransformer.cs
+ * @brief Fixes the required-field list of request schemas in the OpenAPI document.
+ */
+
 using System.Reflection;
 using Microsoft.AspNetCore.OpenApi;
 using Microsoft.OpenApi;
@@ -11,6 +16,10 @@ namespace CSCN73030_26F_Sec1_ProjectV_Group_6.Server.Infrastructure;
 /// </summary>
 public class RequestSchemaTransformer : IOpenApiSchemaTransformer
 {
+    /// <summary>Replaces the required list of a *Request schema with its <see cref="RequiredFieldsAttribute"/> fields.</summary>
+    /// <param name="schema">The schema being generated.</param>
+    /// <param name="context">Generator context.</param>
+    /// <param name="ct">Cancellation token.</param>
     public Task TransformAsync(OpenApiSchema schema, OpenApiSchemaTransformerContext context, CancellationToken ct)
     {
         var type = context.JsonTypeInfo.Type;

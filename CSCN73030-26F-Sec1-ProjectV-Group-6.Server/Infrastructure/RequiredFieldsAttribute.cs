@@ -1,3 +1,8 @@
+/**
+ * @file RequiredFieldsAttribute.cs
+ * @brief Attribute listing the required fields of a request body, for OpenAPI.
+ */
+
 namespace CSCN73030_26F_Sec1_ProjectV_Group_6.Server.Infrastructure;
 
 /// <summary>
@@ -7,7 +12,15 @@ namespace CSCN73030_26F_Sec1_ProjectV_Group_6.Server.Infrastructure;
 /// instead of failing JSON parsing with a 400.)
 /// </summary>
 [AttributeUsage(AttributeTargets.Class)]
-public class RequiredFieldsAttribute(params string[] fields) : Attribute
+public class RequiredFieldsAttribute : Attribute
 {
-    public IReadOnlyList<string> Fields { get; } = fields;
+    /// <summary>Lists the required fields.</summary>
+    /// <param name="fields">camelCase JSON field names.</param>
+    public RequiredFieldsAttribute(params string[] fields)
+    {
+        Fields = fields;
+    }
+
+    /// <summary>camelCase names of the required JSON fields.</summary>
+    public IReadOnlyList<string> Fields { get; }
 }

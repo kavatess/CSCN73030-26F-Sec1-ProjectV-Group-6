@@ -1,3 +1,8 @@
+/**
+ * @file RequisitionsController.cs
+ * @brief The /requisitions endpoints: create (idempotent), list, get, update.
+ */
+
 using CSCN73030_26F_Sec1_ProjectV_Group_6.Server.Application.Services;
 using CSCN73030_26F_Sec1_ProjectV_Group_6.Server.Contracts;
 using CSCN73030_26F_Sec1_ProjectV_Group_6.Server.Infrastructure;
@@ -5,20 +10,29 @@ using Microsoft.AspNetCore.Mvc;
 
 namespace CSCN73030_26F_Sec1_ProjectV_Group_6.Server.Controllers;
 
+/// <summary>HTTP endpoints for hire requisitions. Each action calls one <see cref="RequisitionService"/> method.</summary>
 [ApiController]
 [Route("requisitions")]
 [Produces("application/json")]
 [Tags("Requisitions")]
-public class RequisitionsController(RequisitionService requisitionService) : ControllerBase
+public class RequisitionsController : ControllerBase
 {
+    private readonly RequisitionService _requisitionService;
+
+    /// <summary>Creates the RequisitionsController. Dependencies are supplied by dependency injection.</summary>
+    /// <param name="requisitionService">Requisition business logic.</param>
+    public RequisitionsController(RequisitionService requisitionService)
+    {
+        _requisitionService = requisitionService;
+    }
+
     /// <summary>
     /// Raise a hire requisition. Requires an Idempotency-Key header: replaying the same key with the
     /// same body returns the original requisition (200, header Idempotent-Replayed: true) instead of creating another.
     /// </summary>
     /// <param name="idempotencyKey">A unique value per new requisition, e.g. a GUID. Max 100 characters.</param>
     /// <param name="request">The requisition.</param>
-    /// <response code="201">Created.</response>
-    /// <response code="200">Replay: this Idempotency-Key was already used with the same body; the original is returned.</response>
+    /// <remarks>201 when created. 200 on a replay: the key was already used with the same body, so the original is returned.</remarks>
     [HttpPost]
     [ProducesResponseType<RequisitionDto>(StatusCodes.Status201Created)]
     [ProducesResponseType<RequisitionDto>(StatusCodes.Status200OK)]
@@ -32,7 +46,7 @@ public class RequisitionsController(RequisitionService requisitionService) : Con
         [FromHeader(Name = "Idempotency-Key")] string? idempotencyKey,
         CreateRequisitionRequest request)
     {
-        var result = await requisitionService.CreateAsync(idempotencyKey, request);
+        var result = await _requisitionService.CreateAsync(idempotencyKey, request);
         if (result.Replayed)
         {
             Response.Headers["Idempotent-Replayed"] = "true";
@@ -48,14 +62,16 @@ public class RequisitionsController(RequisitionService requisitionService) : Con
         ExampleErrors = ["status=The value 'Pending' is not valid for Status."])]
     [ProblemResponse(StatusCodes.Status422UnprocessableEntity, "One or more fields are invalid. See 'errors' for details.",
         ExampleErrors = ["department=Unknown department code 'XYZ'."])]
+    /// <param name="query">Type, status and department filters.</param>
     public async Task<ActionResult<List<RequisitionDto>>> List([FromQuery] RequisitionQuery query) =>
-        await requisitionService.ListAsync(query);
+        await _requisitionService.ListAsync(query);
 
     /// <summary>One requisition by number, e.g. REQ-0000001.</summary>
+    /// <param name="number">REQ-0000000.</param>
     [HttpGet("{number}")]
     [ProducesResponseType<RequisitionDto>(StatusCodes.Status200OK)]
     [ProblemResponse(StatusCodes.Status404NotFound, "Requisition 'REQ-0000999' was not found.")]
-    public async Task<ActionResult<RequisitionDto>> Get(string number) => await requisitionService.GetAsync(number);
+    public async Task<ActionResult<RequisitionDto>> Get(string number) => await _requisitionService.GetAsync(number);
 
     /// <summary>Record a status change, budget decision and/or filled count manually.</summary>
     [HttpPatch("{number}")]
@@ -65,6 +81,8 @@ public class RequisitionsController(RequisitionService requisitionService) : Con
     [ProblemResponse(StatusCodes.Status404NotFound, "Requisition 'REQ-0000999' was not found.")]
     [ProblemResponse(StatusCodes.Status422UnprocessableEntity, "One or more fields are invalid. See 'errors' for details.",
         ExampleErrors = ["status=Cannot move from Received to Approved. Allowed: HRReview, Rejected, Closed."])]
+    /// <param name="number">Requisition to update.</param>
+    /// <param name="request">New status, budget decision and/or filled count.</param>
     public async Task<ActionResult<RequisitionDto>> Update(string number, UpdateRequisitionRequest request) =>
-        await requisitionService.UpdateAsync(number, request);
+        await _requisitionService.UpdateAsync(number, request);
 }

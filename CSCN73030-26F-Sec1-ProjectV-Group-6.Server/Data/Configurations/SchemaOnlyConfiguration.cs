@@ -1,3 +1,8 @@
+/**
+ * @file SchemaOnlyConfiguration.cs
+ * @brief EF Core mappings for the tables not used by this release.
+ */
+
 using CSCN73030_26F_Sec1_ProjectV_Group_6.Server.Domain;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
@@ -7,8 +12,11 @@ namespace CSCN73030_26F_Sec1_ProjectV_Group_6.Server.Data.Configurations;
 // Tables created now so next sprint needs no schema migration churn.
 // No endpoint in this release reads or writes them.
 
+/// <summary>EF Core mapping for the Compensation table: salary history, never exposed.</summary>
 public class CompensationConfiguration : IEntityTypeConfiguration<Compensation>
 {
+    /// <summary>Configures the Compensation table.</summary>
+    /// <param name="b">Entity builder.</param>
     public void Configure(EntityTypeBuilder<Compensation> b)
     {
         b.ToTable("Compensation", t =>
@@ -23,8 +31,11 @@ public class CompensationConfiguration : IEntityTypeConfiguration<Compensation>
     }
 }
 
+/// <summary>EF Core mapping for the SecurityFlag table: flags from the Security service.</summary>
 public class SecurityFlagConfiguration : IEntityTypeConfiguration<SecurityFlag>
 {
+    /// <summary>Configures the SecurityFlag table.</summary>
+    /// <param name="b">Entity builder.</param>
     public void Configure(EntityTypeBuilder<SecurityFlag> b)
     {
         b.ToTable("SecurityFlag");
@@ -38,8 +49,11 @@ public class SecurityFlagConfiguration : IEntityTypeConfiguration<SecurityFlag>
     }
 }
 
+/// <summary>EF Core mapping for the AuditLog table: audit trail.</summary>
 public class AuditLogConfiguration : IEntityTypeConfiguration<AuditLog>
 {
+    /// <summary>Configures the AuditLog table.</summary>
+    /// <param name="b">Entity builder.</param>
     public void Configure(EntityTypeBuilder<AuditLog> b)
     {
         b.ToTable("AuditLog");
@@ -52,8 +66,11 @@ public class AuditLogConfiguration : IEntityTypeConfiguration<AuditLog>
     }
 }
 
+/// <summary>EF Core mapping for the OutboxEvent table: event outbox, indexed on PublishedAtUtc.</summary>
 public class OutboxEventConfiguration : IEntityTypeConfiguration<OutboxEvent>
 {
+    /// <summary>Configures the OutboxEvent table.</summary>
+    /// <param name="b">Entity builder.</param>
     public void Configure(EntityTypeBuilder<OutboxEvent> b)
     {
         b.ToTable("OutboxEvent");

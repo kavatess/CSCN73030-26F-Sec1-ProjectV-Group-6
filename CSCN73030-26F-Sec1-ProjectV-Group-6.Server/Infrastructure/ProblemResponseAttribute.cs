@@ -1,3 +1,8 @@
+/**
+ * @file ProblemResponseAttribute.cs
+ * @brief Attribute that declares an error response and its Swagger example.
+ */
+
 using Microsoft.AspNetCore.Mvc;
 
 namespace CSCN73030_26F_Sec1_ProjectV_Group_6.Server.Infrastructure;
@@ -8,10 +13,19 @@ namespace CSCN73030_26F_Sec1_ProjectV_Group_6.Server.Infrastructure;
 /// </summary>
 /// <example>[ProblemResponse(StatusCodes.Status404NotFound, "Staff 'STF-0000042' was not found.")]</example>
 [AttributeUsage(AttributeTargets.Method | AttributeTargets.Class, AllowMultiple = true)]
-public class ProblemResponseAttribute(int statusCode, string exampleDetail)
-    : ProducesResponseTypeAttribute(SchemaFor(statusCode), statusCode, "application/problem+json")
+public class ProblemResponseAttribute : ProducesResponseTypeAttribute
 {
-    public string ExampleDetail { get; } = exampleDetail;
+    /// <summary>Declares the error response.</summary>
+    /// <param name="statusCode">400, 404, 409 or 422.</param>
+    /// <param name="exampleDetail">Example 'detail' text for Swagger.</param>
+    public ProblemResponseAttribute(int statusCode, string exampleDetail)
+        : base(SchemaFor(statusCode), statusCode, "application/problem+json")
+    {
+        ExampleDetail = exampleDetail;
+    }
+
+    /// <summary>Example 'detail' text shown in Swagger.</summary>
+    public string ExampleDetail { get; }
 
     /// <summary>Optional example for the 'errors' dictionary, as "field=message" pairs.</summary>
     public string[] ExampleErrors { get; init; } = [];

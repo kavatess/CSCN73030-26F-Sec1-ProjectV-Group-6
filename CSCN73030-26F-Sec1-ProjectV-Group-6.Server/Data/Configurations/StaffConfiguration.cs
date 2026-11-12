@@ -1,3 +1,8 @@
+/**
+ * @file StaffConfiguration.cs
+ * @brief EF Core mappings for Staff, StaffAssignment and RosterEntry.
+ */
+
 using CSCN73030_26F_Sec1_ProjectV_Group_6.Server.Domain;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata;
@@ -5,8 +10,11 @@ using Microsoft.EntityFrameworkCore.Metadata.Builders;
 
 namespace CSCN73030_26F_Sec1_ProjectV_Group_6.Server.Data.Configurations;
 
+/// <summary>EF Core mapping for the Staff table: unique, immutable StaffNumber (rule 1) and unique Email (rule 2).</summary>
 public class StaffConfiguration : IEntityTypeConfiguration<Staff>
 {
+    /// <summary>Configures the Staff table.</summary>
+    /// <param name="b">Entity builder.</param>
     public void Configure(EntityTypeBuilder<Staff> b)
     {
         b.ToTable("Staff");
@@ -38,8 +46,11 @@ public class StaffConfiguration : IEntityTypeConfiguration<Staff>
     }
 }
 
+/// <summary>EF Core mapping for the StaffAssignment table: check constraint StartDate &lt; EndDate (rule 6).</summary>
 public class StaffAssignmentConfiguration : IEntityTypeConfiguration<StaffAssignment>
 {
+    /// <summary>Configures the StaffAssignment table.</summary>
+    /// <param name="b">Entity builder.</param>
     public void Configure(EntityTypeBuilder<StaffAssignment> b)
     {
         b.ToTable("StaffAssignment", t =>
@@ -57,8 +68,11 @@ public class StaffAssignmentConfiguration : IEntityTypeConfiguration<StaffAssign
     }
 }
 
+/// <summary>EF Core mapping for the RosterEntry table: check constraint ShiftStart &lt; ShiftEnd (rule 6), indexes for overlap and roster queries.</summary>
 public class RosterEntryConfiguration : IEntityTypeConfiguration<RosterEntry>
 {
+    /// <summary>Configures the RosterEntry table.</summary>
+    /// <param name="b">Entity builder.</param>
     public void Configure(EntityTypeBuilder<RosterEntry> b)
     {
         b.ToTable("RosterEntry", t =>

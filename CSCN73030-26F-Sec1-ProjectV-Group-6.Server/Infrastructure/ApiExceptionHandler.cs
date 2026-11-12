@@ -1,3 +1,8 @@
+/**
+ * @file ApiExceptionHandler.cs
+ * @brief Maps exceptions to RFC 7807 ProblemDetails responses.
+ */
+
 using CSCN73030_26F_Sec1_ProjectV_Group_6.Server.Application.Errors;
 using Microsoft.AspNetCore.Diagnostics;
 using Microsoft.AspNetCore.Mvc;
@@ -10,9 +15,26 @@ namespace CSCN73030_26F_Sec1_ProjectV_Group_6.Server.Infrastructure;
 /// Turns exceptions into RFC 7807 ProblemDetails. ApiException subclasses carry their own status;
 /// a unique-index violation that slipped past a service check becomes 409; anything else is a 500.
 /// </summary>
-public class ApiExceptionHandler(IProblemDetailsService problemDetailsService, ILogger<ApiExceptionHandler> logger)
+public class ApiExceptionHandler
     : IExceptionHandler
 {
+    private readonly IProblemDetailsService _problemDetailsService;
+    private readonly ILogger<ApiExceptionHandler> _logger;
+
+    /// <summary>Creates the ApiExceptionHandler. Dependencies are supplied by dependency injection.</summary>
+    /// <param name="problemDetailsService">Writes ProblemDetails responses.</param>
+    /// <param name="logger">Logger.</param>
+    public ApiExceptionHandler(IProblemDetailsService problemDetailsService, ILogger<ApiExceptionHandler> logger)
+    {
+        _problemDetailsService = problemDetailsService;
+        _logger = logger;
+    }
+
+    /// <summary>Writes the ProblemDetails response for <paramref name="exception"/>.</summary>
+    /// <param name="httpContext">Current request.</param>
+    /// <param name="exception">What was thrown.</param>
+    /// <param name="ct">Cancellation token.</param>
+    /// <returns>True when a response was written.</returns>
     public async ValueTask<bool> TryHandleAsync(HttpContext httpContext, Exception exception, CancellationToken ct)
     {
         ProblemDetails problem = exception switch
@@ -37,10 +59,10 @@ public class ApiExceptionHandler(IProblemDetailsService problemDetailsService, I
         };
 
         if (problem.Status == StatusCodes.Status500InternalServerError)
-            logger.LogError(exception, "Unhandled exception for {Method} {Path}", httpContext.Request.Method, httpContext.Request.Path);
+            _logger.LogError(exception, "Unhandled exception for {Method} {Path}", httpContext.Request.Method, httpContext.Request.Path);
 
         httpContext.Response.StatusCode = problem.Status!.Value;
-        return await problemDetailsService.TryWriteAsync(new ProblemDetailsContext
+        return await _problemDetailsService.TryWriteAsync(new ProblemDetailsContext
         {
             HttpContext = httpContext,
             ProblemDetails = problem,
