@@ -4,6 +4,7 @@
  */
 
 using System.Text.Json.Nodes;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.OpenApi;
 using Microsoft.OpenApi;
 
@@ -52,6 +53,18 @@ public class ProblemExamplesTransformer : IOpenApiOperationTransformer
             }
         }
 
+        // Protected endpoints can also answer 401 (no or bad token) and 403 (role not allowed).
+        var metadata = context.Description.ActionDescriptor.EndpointMetadata;
+        if (metadata.OfType<IAuthorizeData>().Any() && !metadata.OfType<IAllowAnonymous>().Any())
+        {
+            operation.Responses ??= new OpenApiResponses();
+            operation.Responses.TryAdd("401", AuthProblem(401, "Unauthorized",
+                "Send a valid Entra ID access token for the Staff/HR API in the Authorization header."));
+            operation.Responses.TryAdd("403", AuthProblem(403, "Forbidden",
+                "Your token does not carry a role allowed to do this."));
+            operation.Security = [new OpenApiSecurityRequirement { [new OpenApiSecuritySchemeReference("Bearer", context.Document)] = [] }];
+        }
+
         // Business rule 3: POST /requisitions must carry an Idempotency-Key header.
         foreach (var parameter in operation.Parameters?.OfType<OpenApiParameter>() ?? [])
         {
@@ -64,6 +77,25 @@ public class ProblemExamplesTransformer : IOpenApiOperationTransformer
         }
         return Task.CompletedTask;
     }
+
+    private static OpenApiResponse AuthProblem(int status, string title, string detail) => new()
+    {
+        Description = status == 401 ? "No token, or the token is invalid or expired." : "The token's roles do not allow this.",
+        Content = new Dictionary<string, OpenApiMediaType>
+        {
+            ["application/problem+json"] = new()
+            {
+                Example = new JsonObject
+                {
+                    ["type"] = status == 401 ? "https://tools.ietf.org/html/rfc9110#section-15.5.2" : "https://tools.ietf.org/html/rfc9110#section-15.5.4",
+                    ["title"] = title,
+                    ["status"] = status,
+                    ["detail"] = detail,
+                    ["traceId"] = "00-4bf92f3577b34da6a3ce929d0e0e4736-00f067aa0ba902b7-00",
+                },
+            },
+        },
+    };
 
     private static JsonObject BuildExample(ProblemResponseAttribute attribute, string? title, string? type)
     {

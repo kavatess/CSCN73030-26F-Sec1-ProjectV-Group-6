@@ -6,11 +6,14 @@
 using CSCN73030_26F_Sec1_ProjectV_Group_6.Server.Application.Services;
 using CSCN73030_26F_Sec1_ProjectV_Group_6.Server.Contracts;
 using CSCN73030_26F_Sec1_ProjectV_Group_6.Server.Infrastructure;
+using CSCN73030_26F_Sec1_ProjectV_Group_6.Server.Infrastructure.Auth;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
 namespace CSCN73030_26F_Sec1_ProjectV_Group_6.Server.Controllers;
 
 /// <summary>HTTP endpoints for security flags. Each action calls one <see cref="SecurityFlagService"/> method.</summary>
+[Authorize(Policy = StaffHrPolicies.SecurityFlags)]
 [ApiController]
 [Produces("application/json")]
 [Tags("Security flags")]

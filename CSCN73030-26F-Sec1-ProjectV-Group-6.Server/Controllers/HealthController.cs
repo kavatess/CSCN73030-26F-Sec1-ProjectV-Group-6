@@ -4,12 +4,15 @@
  */
 
 using CSCN73030_26F_Sec1_ProjectV_Group_6.Server.Contracts;
+using CSCN73030_26F_Sec1_ProjectV_Group_6.Server.Infrastructure.Auth;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Diagnostics.HealthChecks;
 
 namespace CSCN73030_26F_Sec1_ProjectV_Group_6.Server.Controllers;
 
 /// <summary>Reports whether the service and its database are up.</summary>
+[AllowAnonymous]
 [ApiController]
 [Route("health")]
 [Produces("application/json")]

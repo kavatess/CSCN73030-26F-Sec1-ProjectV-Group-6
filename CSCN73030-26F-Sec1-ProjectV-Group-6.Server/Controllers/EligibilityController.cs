@@ -6,11 +6,14 @@
 using CSCN73030_26F_Sec1_ProjectV_Group_6.Server.Application.Services;
 using CSCN73030_26F_Sec1_ProjectV_Group_6.Server.Contracts;
 using CSCN73030_26F_Sec1_ProjectV_Group_6.Server.Infrastructure;
+using CSCN73030_26F_Sec1_ProjectV_Group_6.Server.Infrastructure.Auth;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
 namespace CSCN73030_26F_Sec1_ProjectV_Group_6.Server.Controllers;
 
 /// <summary>HTTP endpoint for duty eligibility. Calls <see cref="EligibilityService"/>.</summary>
+[Authorize(Policy = StaffHrPolicies.Read)]
 [ApiController]
 [Produces("application/json")]
 [Tags("Eligibility")]

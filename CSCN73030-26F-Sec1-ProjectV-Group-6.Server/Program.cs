@@ -18,6 +18,7 @@ using CSCN73030_26F_Sec1_ProjectV_Group_6.Server.Data.Auditing;
 using CSCN73030_26F_Sec1_ProjectV_Group_6.Server.Data.Repositories;
 using CSCN73030_26F_Sec1_ProjectV_Group_6.Server.Data.Seeding;
 using CSCN73030_26F_Sec1_ProjectV_Group_6.Server.Infrastructure;
+using CSCN73030_26F_Sec1_ProjectV_Group_6.Server.Infrastructure.Auth;
 using CSCN73030_26F_Sec1_ProjectV_Group_6.Server.Infrastructure.Messaging;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.Infrastructure;
@@ -74,6 +75,9 @@ builder.Services.AddOpenApi(options =>
     options.AddOperationTransformer<ProblemExamplesTransformer>();
     options.AddSchemaTransformer<RequestSchemaTransformer>();
 });
+
+// ---- Authentication and role-based authorization --------------------------------------------
+builder.AddStaffHrAuth();
 
 // ---- Database -------------------------------------------------------------------------------
 builder.Services.AddHttpContextAccessor();
@@ -152,6 +156,7 @@ if (app.Environment.IsDevelopment())
 
 app.UseHttpsRedirection();
 
+app.UseAuthentication();
 app.UseAuthorization();
 
 app.MapControllers();

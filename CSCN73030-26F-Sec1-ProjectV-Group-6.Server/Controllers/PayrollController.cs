@@ -6,11 +6,14 @@
 using CSCN73030_26F_Sec1_ProjectV_Group_6.Server.Application.Services;
 using CSCN73030_26F_Sec1_ProjectV_Group_6.Server.Contracts;
 using CSCN73030_26F_Sec1_ProjectV_Group_6.Server.Infrastructure;
+using CSCN73030_26F_Sec1_ProjectV_Group_6.Server.Infrastructure.Auth;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
 namespace CSCN73030_26F_Sec1_ProjectV_Group_6.Server.Controllers;
 
 /// <summary>HTTP endpoints for pay. Each action calls one <see cref="PayrollService"/> method.</summary>
+[Authorize(Policy = StaffHrPolicies.Payroll)]
 [ApiController]
 [Produces("application/json")]
 [Tags("Payroll")]

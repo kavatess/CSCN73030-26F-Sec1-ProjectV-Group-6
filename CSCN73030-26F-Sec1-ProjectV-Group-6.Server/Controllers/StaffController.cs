@@ -6,11 +6,14 @@
 using CSCN73030_26F_Sec1_ProjectV_Group_6.Server.Application.Services;
 using CSCN73030_26F_Sec1_ProjectV_Group_6.Server.Contracts;
 using CSCN73030_26F_Sec1_ProjectV_Group_6.Server.Infrastructure;
+using CSCN73030_26F_Sec1_ProjectV_Group_6.Server.Infrastructure.Auth;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
 namespace CSCN73030_26F_Sec1_ProjectV_Group_6.Server.Controllers;
 
 /// <summary>HTTP endpoints for employees. Each action calls one <see cref="StaffService"/> method.</summary>
+[Authorize(Policy = StaffHrPolicies.Read)]
 [ApiController]
 [Route("staff")]
 [Produces("application/json")]
@@ -28,6 +31,7 @@ public class StaffController : ControllerBase
 
     /// <summary>Onboard a new employee and issue their staff number (STF-0000000).</summary>
     /// <remarks>201 Created; the Location header points at the new profile.</remarks>
+    [Authorize(Policy = StaffHrPolicies.Manage)]
     [HttpPost]
     [ProducesResponseType<StaffProfileDto>(StatusCodes.Status201Created)]
     [ProblemResponse(StatusCodes.Status400BadRequest, "The request body could not be read.",
@@ -51,6 +55,7 @@ public class StaffController : ControllerBase
         await _staffService.GetProfileAsync(staffNumber);
 
     /// <summary>Partial update. Omit fields you are not changing. The staff number cannot be changed.</summary>
+    [Authorize(Policy = StaffHrPolicies.Manage)]
     [HttpPatch("{staffNumber}")]
     [ProducesResponseType<StaffProfileDto>(StatusCodes.Status200OK)]
     [ProblemResponse(StatusCodes.Status400BadRequest, "The request body could not be read.",

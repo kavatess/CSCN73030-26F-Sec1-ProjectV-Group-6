@@ -6,11 +6,14 @@
 using CSCN73030_26F_Sec1_ProjectV_Group_6.Server.Application.Services;
 using CSCN73030_26F_Sec1_ProjectV_Group_6.Server.Contracts;
 using CSCN73030_26F_Sec1_ProjectV_Group_6.Server.Infrastructure;
+using CSCN73030_26F_Sec1_ProjectV_Group_6.Server.Infrastructure.Auth;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
 namespace CSCN73030_26F_Sec1_ProjectV_Group_6.Server.Controllers;
 
 /// <summary>HTTP endpoint for the audit trail. Calls <see cref="AuditService"/>.</summary>
+[Authorize(Policy = StaffHrPolicies.Audit)]
 [ApiController]
 [Route("audit")]
 [Produces("application/json")]

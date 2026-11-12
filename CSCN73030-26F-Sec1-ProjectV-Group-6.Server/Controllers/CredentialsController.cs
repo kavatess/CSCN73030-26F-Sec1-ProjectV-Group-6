@@ -6,11 +6,14 @@
 using CSCN73030_26F_Sec1_ProjectV_Group_6.Server.Application.Services;
 using CSCN73030_26F_Sec1_ProjectV_Group_6.Server.Contracts;
 using CSCN73030_26F_Sec1_ProjectV_Group_6.Server.Infrastructure;
+using CSCN73030_26F_Sec1_ProjectV_Group_6.Server.Infrastructure.Auth;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
 namespace CSCN73030_26F_Sec1_ProjectV_Group_6.Server.Controllers;
 
 /// <summary>HTTP endpoints for credentials. Each action calls one <see cref="CredentialService"/> method.</summary>
+[Authorize(Policy = StaffHrPolicies.Read)]
 [ApiController]
 [Produces("application/json")]
 [Tags("Credentials")]
@@ -52,6 +55,7 @@ public class CredentialsController : ControllerBase
         await _credentialService.ExpiringAsync(withinDays);
 
     /// <summary>Record a new credential for a staff member.</summary>
+    [Authorize(Policy = StaffHrPolicies.Manage)]
     [HttpPost("staff/{staffNumber}/credentials")]
     [ProducesResponseType<CredentialDto>(StatusCodes.Status201Created)]
     [ProblemResponse(StatusCodes.Status400BadRequest, "The request body could not be read.",
@@ -68,6 +72,7 @@ public class CredentialsController : ControllerBase
     }
 
     /// <summary>Record a renewal (new number / dates) or suspend / lift a suspension.</summary>
+    [Authorize(Policy = StaffHrPolicies.Manage)]
     [HttpPatch("credentials/{id:int}")]
     [ProducesResponseType<CredentialDto>(StatusCodes.Status200OK)]
     [ProblemResponse(StatusCodes.Status400BadRequest, "The request body could not be read.",

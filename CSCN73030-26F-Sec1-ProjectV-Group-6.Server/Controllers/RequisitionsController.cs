@@ -6,11 +6,14 @@
 using CSCN73030_26F_Sec1_ProjectV_Group_6.Server.Application.Services;
 using CSCN73030_26F_Sec1_ProjectV_Group_6.Server.Contracts;
 using CSCN73030_26F_Sec1_ProjectV_Group_6.Server.Infrastructure;
+using CSCN73030_26F_Sec1_ProjectV_Group_6.Server.Infrastructure.Auth;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
 namespace CSCN73030_26F_Sec1_ProjectV_Group_6.Server.Controllers;
 
 /// <summary>HTTP endpoints for hire requisitions. Each action calls one <see cref="RequisitionService"/> method.</summary>
+[Authorize(Policy = StaffHrPolicies.Read)]
 [ApiController]
 [Route("requisitions")]
 [Produces("application/json")]
@@ -33,6 +36,7 @@ public class RequisitionsController : ControllerBase
     /// <param name="idempotencyKey">A unique value per new requisition, e.g. a GUID. Max 100 characters.</param>
     /// <param name="request">The requisition.</param>
     /// <remarks>201 when created. 200 on a replay: the key was already used with the same body, so the original is returned.</remarks>
+    [Authorize(Policy = StaffHrPolicies.SubmitRequisitions)]
     [HttpPost]
     [ProducesResponseType<RequisitionDto>(StatusCodes.Status201Created)]
     [ProducesResponseType<RequisitionDto>(StatusCodes.Status200OK)]
@@ -74,6 +78,7 @@ public class RequisitionsController : ControllerBase
     public async Task<ActionResult<RequisitionDto>> Get(string number) => await _requisitionService.GetAsync(number);
 
     /// <summary>Record a status change, budget decision and/or filled count manually.</summary>
+    [Authorize(Policy = StaffHrPolicies.Manage)]
     [HttpPatch("{number}")]
     [ProducesResponseType<RequisitionDto>(StatusCodes.Status200OK)]
     [ProblemResponse(StatusCodes.Status400BadRequest, "The request body could not be read.",

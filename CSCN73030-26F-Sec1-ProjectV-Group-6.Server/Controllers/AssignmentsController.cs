@@ -6,11 +6,14 @@
 using CSCN73030_26F_Sec1_ProjectV_Group_6.Server.Application.Services;
 using CSCN73030_26F_Sec1_ProjectV_Group_6.Server.Contracts;
 using CSCN73030_26F_Sec1_ProjectV_Group_6.Server.Infrastructure;
+using CSCN73030_26F_Sec1_ProjectV_Group_6.Server.Infrastructure.Auth;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
 namespace CSCN73030_26F_Sec1_ProjectV_Group_6.Server.Controllers;
 
 /// <summary>HTTP endpoints for staff assignments. Each action calls one <see cref="AssignmentService"/> method.</summary>
+[Authorize(Policy = StaffHrPolicies.Read)]
 [ApiController]
 [Produces("application/json")]
 [Tags("Assignments")]
@@ -26,6 +29,7 @@ public class AssignmentsController : ControllerBase
     }
 
     /// <summary>Give a staff member a role in a service.</summary>
+    [Authorize(Policy = StaffHrPolicies.Manage)]
     [HttpPost("staff/{staffNumber}/assignments")]
     [ProducesResponseType<AssignmentDto>(StatusCodes.Status201Created)]
     [ProblemResponse(StatusCodes.Status400BadRequest, "The request body could not be read.",
@@ -50,6 +54,7 @@ public class AssignmentsController : ControllerBase
         await _assignmentService.ListForStaffAsync(staffNumber);
 
     /// <summary>Close an assignment by setting its EndDate.</summary>
+    [Authorize(Policy = StaffHrPolicies.Manage)]
     [HttpPatch("assignments/{id:int}")]
     [ProducesResponseType<AssignmentDto>(StatusCodes.Status200OK)]
     [ProblemResponse(StatusCodes.Status400BadRequest, "The request body could not be read.",

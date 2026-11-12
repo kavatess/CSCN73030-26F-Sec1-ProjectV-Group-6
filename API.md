@@ -16,6 +16,26 @@ Contract for review by the other CMES groups. The live, always-current version i
 - **PATCH** bodies are partial: omit a field (or send `null`) to leave it unchanged.
 - **Salary is never returned** by staff or search endpoints. Only the payroll endpoints (restricted to the payroll role) return it.
 
+### Authentication and roles
+
+Every endpoint except `GET /health` needs an **Entra ID access token** for the Staff/HR API
+(`Authorization: Bearer <token>`, audience `api://cmes-staff-hr`). Access is granted by **app roles** in the token's
+`roles` claim:
+
+| Role | Grants |
+| --- | --- |
+| `StaffHr.Read` | Read staff, departments, assignments, rosters, requisitions, credentials, eligibility |
+| `StaffHr.Admin` | Everything HR does: create/change staff, assignments, credentials; move requisitions through their workflow; read audit and security flags |
+| `StaffHr.Rosters.Write` | Add and remove roster entries |
+| `StaffHr.Requisitions.Submit` | Raise hire and termination requisitions (`POST /requisitions`) |
+| `StaffHr.SecurityFlags.Write` | Sync and read security flags (the Security service) |
+| `StaffHr.Payroll` | Compensation and payroll headcount, the only endpoints with salary (payroll officers, the Budget service). `StaffHr.Admin` does **not** include it. |
+| `StaffHr.Audit.Read` | Read the audit log |
+
+Any role also grants read access. `401` = no, expired or invalid token; `403` = the token's roles do not allow the
+request. Both are `application/problem+json`. In the Development environment no token is needed: every request is
+signed in as `dev-user` with all roles (headers `X-Dev-Roles`, `X-Dev-User`, `X-Dev-Anonymous` let you test others).
+
 ### Enums
 
 | Enum | Values |
@@ -47,6 +67,8 @@ Every error is `application/problem+json`:
 | Status | Meaning | `errors` |
 | --- | --- | --- |
 | 400 | Malformed: unreadable JSON, wrong value type (incl. unknown enum value), empty body, missing `Idempotency-Key` | Present when the problem is in a field (`$.hireDate`, `pageSize`) |
+| 401 | No, expired or invalid access token | — |
+| 403 | The token's roles do not allow the request | — |
 | 404 | The resource in the URL doesn't exist | — |
 | 409 | Conflict: duplicate work email, `Idempotency-Key` reused with a different body, overlapping shift | — |
 | 422 | Well-formed but breaks a rule; one entry per invalid field | Always |
