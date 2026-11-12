@@ -145,8 +145,9 @@ namespace CSCN73030_26F_Sec1_ProjectV_Group_6.Server.Tests.Api
             var rows = await GetAsync<List<ServiceHeadcountDto>>("/rosters/headcount");
 
             Assert.Equal(Seed.ServiceCount, rows.Count);
-            // Only the Paramedic Service is rostered at 12:00 on the test day.
-            Assert.Equal(2, rows.Sum(r => r.OnDuty));
+            // Among seeded services only the Paramedic Service is rostered at 12:00 on the test day.
+            // (HRS is excluded: write tests roster their own HRS staff.)
+            Assert.Equal(2, rows.Where(r => r.DepartmentCode != "HRS").Sum(r => r.OnDuty));
             // Rowan (OnLeave) does not count as active in Fire & Rescue.
             Assert.Equal(0, rows.Single(r => r.ServiceName == "Fire & Rescue").Active);
         }

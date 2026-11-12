@@ -170,7 +170,7 @@ public class StaffService
         errors.MaxLength("phone", request.Phone, 30);
         errors.MaxLength("citizenId", request.CitizenId, 30);
         errors.AddIf(request.EmploymentStatus == EmploymentStatus.Terminated, "employmentStatus",
-            "Termination must go through a termination requisition, which is not available in this release.");
+            "Termination must go through a termination requisition (POST /requisitions with type Termination).");
         ValidateBirthAndHireDates(errors, request.DateOfBirth ?? staff.DateOfBirth, request.HireDate ?? staff.HireDate);
 
         Department? newDepartment = null;

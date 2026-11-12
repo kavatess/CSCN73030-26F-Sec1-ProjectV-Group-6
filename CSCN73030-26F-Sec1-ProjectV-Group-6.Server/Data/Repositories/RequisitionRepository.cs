@@ -53,6 +53,14 @@ public class RequisitionRepository
         return $"REQ-{values.Single():D7}";
     }
 
+    /// <summary>True when the staff member already has a termination requisition that is not Completed, Rejected or Closed.</summary>
+    /// <param name="staffId">Staff key.</param>
+    public Task<bool> HasOpenTerminationAsync(int staffId) =>
+        _db.Requisitions.AnyAsync(r => r.StaffId == staffId && r.Type == RequisitionType.Termination &&
+                                       r.Status != RequisitionStatus.Completed &&
+                                       r.Status != RequisitionStatus.Rejected &&
+                                       r.Status != RequisitionStatus.Closed);
+
     /// <summary>Adds a new requisition to be inserted on the next save.</summary>
     /// <param name="requisition">The new requisition.</param>
     public void Add(Requisition requisition) => _db.Requisitions.Add(requisition);

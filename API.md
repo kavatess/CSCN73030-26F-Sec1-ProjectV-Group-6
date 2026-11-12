@@ -24,7 +24,7 @@ Contract for review by the other CMES groups. The live, always-current version i
 | EmploymentType | `FullTime`, `PartTime`, `Contract`, `Seasonal` |
 | ShiftType | `Day`, `Evening`, `Night`, `OnCall` |
 | RosterStatus | `Scheduled`, `Confirmed`, `Completed`, `Cancelled` |
-| RequisitionType | `Hire`, `Termination` (only `Hire` accepted in this release) |
+| RequisitionType | `Hire`, `Termination` |
 | RequisitionStatus | `Received`, `HRReview`, `AwaitingBudget`, `Approved`, `Rejected`, `Filling`, `Completed`, `Closed` |
 | BudgetDecision | `Pending`, `Approved`, `Rejected` |
 | CredentialStatus | `Valid`, `Expiring`, `Expired`, `Suspended` |
@@ -128,7 +128,7 @@ Any subset of: `firstName`, `lastName`, `preferredName`, `email`, `dateOfBirth`,
 `phone` or `citizenId`.
 
 - `staffNumber` may be sent but must equal the current value; anything else is `422`.
-- `employmentStatus: "Terminated"` is `422` (termination goes through a termination requisition, not built yet).
+- `employmentStatus: "Terminated"` is `422`: termination goes through a termination requisition.
 - Changing `homeDepartmentCode` (a transfer) leaves the staff number unchanged.
 
 `200` → `StaffProfile` · `400` · `404` · `409` email taken · `422`
@@ -231,15 +231,17 @@ One row per service (all, or only `service`):
 
 Non-cancelled shifts covering instant `at` (default now). `200` → `RosterEntry[]` · `400` · `422`
 
-## Requisitions (Hire only)
+## Requisitions (Hire and Termination)
 
 ### `POST /requisitions`
 
 Header **`Idempotency-Key: <unique value, e.g. a GUID>`** is required (max 100 characters).
 
+Hire:
+
 ```json
 {
-  "type": "Hire",                   // optional, default Hire; Termination → 422
+  "type": "Hire",                   // optional, default Hire
   "departmentCode": "EMS",          // required
   "roleTitle": "Emergency Dispatcher",  // required
   "positions": 2,                   // required, 1–100
@@ -247,7 +249,20 @@ Header **`Idempotency-Key: <unique value, e.g. a GUID>`** is required (max 100 c
 }
 ```
 
-New requisitions start as `Received` with `budgetDecision: null` and get a number `REQ-0000000`.
+Termination:
+
+```json
+{
+  "type": "Termination",
+  "staffNumber": "STF-0000021",     // required; must not already be Terminated
+  "reasonCode": "RESIGNATION",      // required, e.g. RESIGNATION, RETIREMENT, DISMISSAL, END_OF_CONTRACT
+  "departmentCode": "EMS",          // optional, defaults to the employee's home department
+  "roleTitle": "Paramedic"          // optional, defaults to the employee's current role
+}
+```
+
+A person can have only one open termination at a time (a second one is `409`). New requisitions start as
+`Received` with `budgetDecision: null` and get a number `REQ-0000000`.
 
 | Case | Response |
 | --- | --- |
@@ -274,14 +289,24 @@ Newest first. `200` → `Requisition[]` · `400` bad enum · `422` unknown depar
 At least one field. Status moves allowed:
 
 ```text
-Received → HRReview → AwaitingBudget → Approved → Filling → Completed → Closed
-Received / HRReview / AwaitingBudget → Rejected
-any status except Rejected / Closed → Closed
+Hire:        Received → HRReview → AwaitingBudget → Approved → Filling → Completed → Closed
+             Received / HRReview / AwaitingBudget → Rejected
+Termination: Received → HRReview → Approved → Completed → Closed
+             Received / HRReview → Rejected
+Both:        any status except Rejected / Closed → Closed
 ```
 
+Hire:
 - `Approved` requires `budgetDecision` `Approved` (already stored, or in the same request).
 - `Completed` requires `positionsFilled == positions`.
 - `positionsFilled` must be 0 … `positions`.
+
+Termination (no `budgetDecision` or `positionsFilled`; sending either is `422`). Moving to **Completed** carries out
+the termination in one transaction:
+- employment status becomes `Terminated` (the staff number is kept and never reused);
+- open assignments end today; assignments that had not started are removed;
+- shifts that have not finished are `Cancelled`, so the person is no longer eligible for duty;
+- a `Staff.Terminated` event is published.
 
 `200` → `Requisition` · `400` · `404` · `422`
 
@@ -427,6 +452,15 @@ Sent when `POST /staff` succeeds. Contains no date of birth, citizen id or salar
 ```
 
 `serviceId` and `roleTitle` are `null` when no initial assignment was given.
+
+### `Staff.Terminated`
+
+Sent when a termination requisition is completed. Remove the person from your active lists and rosters.
+
+```json
+{ "staffNumber": "STF-0000021", "departmentCode": "EMS", "effectiveDate": "2026-11-05",
+  "requisitionNumber": "REQ-0000012", "cancelledShifts": 2 }
+```
 
 Configuration (section `Messaging`): set `ServiceBus:FullyQualifiedNamespace` (managed identity) or
 `ServiceBus:ConnectionString`. With neither set, events are written to the application log instead.

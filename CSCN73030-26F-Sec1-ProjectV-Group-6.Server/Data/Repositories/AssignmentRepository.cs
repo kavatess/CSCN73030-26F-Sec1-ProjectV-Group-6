@@ -43,6 +43,10 @@ public class AssignmentRepository
     /// <param name="assignment">The new assignment.</param>
     public void Add(StaffAssignment assignment) => _db.StaffAssignments.Add(assignment);
 
+    /// <summary>Marks an assignment for deletion on the next save.</summary>
+    /// <param name="assignment">The assignment to delete.</param>
+    public void Remove(StaffAssignment assignment) => _db.StaffAssignments.Remove(assignment);
+
     /// <summary>Saves pending changes to the database.</summary>
     public Task SaveChangesAsync() => _db.SaveChangesAsync();
 }

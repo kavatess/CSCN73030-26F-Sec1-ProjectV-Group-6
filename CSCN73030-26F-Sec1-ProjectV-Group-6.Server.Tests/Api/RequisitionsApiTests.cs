@@ -127,11 +127,11 @@ namespace CSCN73030_26F_Sec1_ProjectV_Group_6.Server.Tests.Api
         }
 
         [Fact]
-        public async Task Create_Termination_Returns422()
+        public async Task Create_TerminationWithoutStaffNumberOrReason_Returns422()
         {
             await AssertProblemAsync(
                 await PostAsync("/requisitions", new { type = "Termination", departmentCode = "HRS", roleTitle = "X", positions = 1 }, NewKey()),
-                HttpStatusCode.UnprocessableEntity, "type");
+                HttpStatusCode.UnprocessableEntity, "staffNumber", "reasonCode");
         }
 
         [Theory]

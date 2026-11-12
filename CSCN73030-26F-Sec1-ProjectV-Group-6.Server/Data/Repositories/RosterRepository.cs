@@ -89,6 +89,14 @@ public class RosterRepository
             .ToList();
     }
 
+    /// <summary>A staff member's shifts that have not finished and are not cancelled (tracked, for termination).</summary>
+    /// <param name="staffId">Staff key.</param>
+    /// <param name="now">Current instant (UTC).</param>
+    public Task<List<RosterEntry>> ListUnfinishedForStaffAsync(int staffId, DateTime now) =>
+        _db.RosterEntries
+            .Where(r => r.StaffId == staffId && r.ShiftEnd > now && r.Status != RosterStatus.Cancelled)
+            .ToListAsync();
+
     /// <summary>Adds a new shift to be inserted on the next save.</summary>
     /// <param name="entry">The new shift.</param>
     public void Add(RosterEntry entry) => _db.RosterEntries.Add(entry);

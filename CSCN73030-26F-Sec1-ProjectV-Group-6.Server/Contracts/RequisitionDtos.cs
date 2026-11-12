@@ -8,25 +8,34 @@ using CSCN73030_26F_Sec1_ProjectV_Group_6.Server.Domain;
 
 namespace CSCN73030_26F_Sec1_ProjectV_Group_6.Server.Contracts;
 
-/// <summary>Body of POST /requisitions. Send with an Idempotency-Key header.</summary>
-/// <param name="Type">Only Hire is supported in this release. Defaults to Hire.</param>
-/// <param name="DepartmentCode">Required. Requesting department code, e.g. EMS.</param>
-/// <param name="RoleTitle">Required. Job title to hire for.</param>
-/// <param name="Positions">Required. Number of people to hire, 1 to 100.</param>
-/// <param name="ReasonCode">Optional reason, e.g. GROWTH, max 50 characters.</param>
+/// <summary>
+/// Body of POST /requisitions. Send with an Idempotency-Key header.
+/// Hire: departmentCode, roleTitle and positions are required.
+/// Termination: staffNumber and reasonCode are required; departmentCode defaults to the employee's
+/// home department and roleTitle to their current role.
+/// </summary>
+/// <param name="Type">Hire or Termination. Defaults to Hire.</param>
+/// <param name="DepartmentCode">Requesting department code, e.g. EMS.</param>
+/// <param name="RoleTitle">Hire: job title to hire for. Termination: optional.</param>
+/// <param name="Positions">Hire: number of people to hire, 1 to 100. Termination: omit (always 1).</param>
+/// <param name="ReasonCode">Reason, max 50 characters, e.g. GROWTH, or RESIGNATION / RETIREMENT / DISMISSAL / END_OF_CONTRACT. Required for Termination.</param>
+/// <param name="StaffNumber">Termination only: the employee to terminate.</param>
 [RequiredFields("departmentCode", "roleTitle", "positions")]
 public record CreateRequisitionRequest(
     RequisitionType? Type,
     string? DepartmentCode,
     string? RoleTitle,
     int? Positions,
-    string? ReasonCode);
+    string? ReasonCode,
+    string? StaffNumber = null);
 
 /// <summary>
 /// Body of PATCH /requisitions/{number}. Records a status change and/or budget decision by hand.
-/// Allowed status moves: Received → HRReview → AwaitingBudget → Approved → Filling → Completed → Closed;
-/// Received, HRReview and AwaitingBudget may also move to Rejected; any non-final status may move to Closed.
+/// Hire: Received → HRReview → AwaitingBudget → Approved → Filling → Completed → Closed; Received,
+/// HRReview and AwaitingBudget may also move to Rejected; any non-final status may move to Closed.
 /// Approved requires BudgetDecision Approved.
+/// Termination: Received → HRReview → Approved → Completed → Closed; Received and HRReview may move
+/// to Rejected. Moving to Completed carries out the termination. No budgetDecision or positionsFilled.
 /// </summary>
 /// <param name="Status">New status; must be an allowed move.</param>
 /// <param name="BudgetDecision">Budget &amp; Treasury's decision.</param>

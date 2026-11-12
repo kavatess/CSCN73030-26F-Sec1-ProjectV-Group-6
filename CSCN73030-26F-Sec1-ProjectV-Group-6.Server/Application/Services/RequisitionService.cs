@@ -1,6 +1,6 @@
 /**
  * @file RequisitionService.cs
- * @brief Business logic for hire requisitions, including idempotent create.
+ * @brief Business logic for hire and termination requisitions, including idempotent create.
  */
 
 using CSCN73030_26F_Sec1_ProjectV_Group_6.Server.Application.Errors;
@@ -13,19 +13,26 @@ using Microsoft.EntityFrameworkCore;
 
 namespace CSCN73030_26F_Sec1_ProjectV_Group_6.Server.Application.Services;
 
-/// <summary>Hire requisitions. Termination requisitions are out of scope for this release.</summary>
+/// <summary>Hire and termination requisitions: idempotent create, listing and the status workflow.</summary>
 public class RequisitionService
 {
     private readonly RequisitionRepository _requisitionRepository;
     private readonly DepartmentRepository _departmentRepository;
     private readonly Clock _clock;
+    private readonly StaffRepository _staffRepository;
+    private readonly TerminationService _terminationService;
 
     /// <summary>Creates the RequisitionService. Dependencies are supplied by dependency injection.</summary>
     /// <param name="requisitionRepository">Requisition data access.</param>
     /// <param name="departmentRepository">Department and service data access.</param>
     /// <param name="clock">Current UTC time.</param>
-    public RequisitionService(RequisitionRepository requisitionRepository, DepartmentRepository departmentRepository, Clock clock)
+    /// <param name="staffRepository">Staff lookups for termination requisitions.</param>
+    /// <param name="terminationService">Carries out completed terminations.</param>
+    public RequisitionService(RequisitionRepository requisitionRepository, DepartmentRepository departmentRepository, Clock clock,
+        StaffRepository staffRepository, TerminationService terminationService)
     {
+        _staffRepository = staffRepository;
+        _terminationService = terminationService;
         _requisitionRepository = requisitionRepository;
         _departmentRepository = departmentRepository;
         _clock = clock;
@@ -64,36 +71,9 @@ public class RequisitionService
         if (original != null)
             return Replay(original, request, idempotencyKey);
 
-        var errors = new ValidationErrors();
-        errors.AddIf(request.Type == RequisitionType.Termination, "type",
-            "Only Hire requisitions are supported in this release.");
-        errors.Required("departmentCode", request.DepartmentCode, 10);
-        errors.Required("roleTitle", request.RoleTitle);
-        errors.Required("positions", request.Positions);
-        errors.AddIf(request.Positions is < 1 or > MaxPositions, "positions", $"Positions must be between 1 and {MaxPositions}.");
-        errors.MaxLength("reasonCode", request.ReasonCode, 50);
-
-        Department? department = null;
-        if (!string.IsNullOrWhiteSpace(request.DepartmentCode))
-        {
-            department = await _departmentRepository.GetByCodeAsync(request.DepartmentCode);
-            errors.AddIf(department == null, "departmentCode", $"Unknown department code '{request.DepartmentCode}'.");
-        }
-        errors.ThrowIfAny();
-
-        var requisition = new Requisition
-        {
-            RequisitionNumber = await _requisitionRepository.NextRequisitionNumberAsync(),
-            RequestingDeptId = department!.DepartmentId,
-            Type = RequisitionType.Hire,
-            RoleTitle = request.RoleTitle!.Trim(),
-            Positions = request.Positions!.Value,
-            PositionsFilled = 0,
-            Status = RequisitionStatus.Received,
-            ReasonCode = Text.TrimToNull(request.ReasonCode),
-            IdempotencyKey = idempotencyKey,
-            CreatedAtUtc = _clock.UtcNow,
-        };
+        var requisition = (request.Type ?? RequisitionType.Hire) == RequisitionType.Termination
+            ? await BuildTerminationAsync(request, idempotencyKey)
+            : await BuildHireAsync(request, idempotencyKey);
         _requisitionRepository.Add(requisition);
 
         try
@@ -140,7 +120,10 @@ public class RequisitionService
         return requisition.ToDto();
     }
 
-    /// <summary>Records a status change, budget decision and/or filled count by hand.</summary>
+    /// <summary>
+    /// Records a status change, budget decision and/or filled count by hand. Moving a Termination
+    /// requisition to Completed carries out the termination in the same save.
+    /// </summary>
     /// <param name="requisitionNumber">Requisition to update.</param>
     /// <param name="request">New status, budget decision and/or filled count.</param>
     /// <exception cref="Errors.NotFoundException">The requisition does not exist.</exception>
@@ -149,6 +132,7 @@ public class RequisitionService
     {
         var requisition = await _requisitionRepository.GetByNumberAsync(requisitionNumber)
                           ?? throw new NotFoundException("Requisition", requisitionNumber);
+        var isTermination = requisition.Type == RequisitionType.Termination;
 
         var errors = new ValidationErrors();
         errors.AddIf(request is { Status: null, BudgetDecision: null, PositionsFilled: null }, "body",
@@ -159,37 +143,140 @@ public class RequisitionService
         var newFilled = request.PositionsFilled ?? requisition.PositionsFilled;
 
         if (request.Status != null && request.Status != requisition.Status &&
-            !RequisitionWorkflow.CanMove(requisition.Status, request.Status.Value))
+            !RequisitionWorkflow.CanMove(requisition.Type, requisition.Status, request.Status.Value))
         {
-            var allowed = RequisitionWorkflow.NextStatuses(requisition.Status);
+            var allowed = RequisitionWorkflow.NextStatuses(requisition.Type, requisition.Status);
             errors.Add("status", allowed.Count == 0
                 ? $"{requisition.Status} is a final status; the requisition can no longer change."
-                : $"Cannot move from {requisition.Status} to {request.Status}. Allowed: {string.Join(", ", allowed)}.");
+                : $"Cannot move a {requisition.Type} requisition from {requisition.Status} to {request.Status}. Allowed: {string.Join(", ", allowed)}.");
         }
-        errors.AddIf(request.Status == RequisitionStatus.Approved && newDecision != BudgetDecision.Approved, "budgetDecision",
-            "A requisition can only be Approved once Budget has approved it (budgetDecision = Approved).");
-        errors.AddIf(newFilled < 0 || newFilled > requisition.Positions, "positionsFilled",
-            $"PositionsFilled must be between 0 and {requisition.Positions}.");
-        errors.AddIf(request.Status == RequisitionStatus.Completed && newFilled != requisition.Positions, "positionsFilled",
-            "A requisition can only be Completed when every position is filled.");
+
+        if (isTermination)
+        {
+            errors.AddIf(request.BudgetDecision != null, "budgetDecision", "Termination requisitions have no budget decision.");
+            errors.AddIf(request.PositionsFilled != null, "positionsFilled", "Termination requisitions have no positions to fill.");
+        }
+        else
+        {
+            errors.AddIf(request.Status == RequisitionStatus.Approved && newDecision != BudgetDecision.Approved, "budgetDecision",
+                "A requisition can only be Approved once Budget has approved it (budgetDecision = Approved).");
+            errors.AddIf(newFilled < 0 || newFilled > requisition.Positions, "positionsFilled",
+                $"PositionsFilled must be between 0 and {requisition.Positions}.");
+            errors.AddIf(request.Status == RequisitionStatus.Completed && newFilled != requisition.Positions, "positionsFilled",
+                "A requisition can only be Completed when every position is filled.");
+        }
         errors.ThrowIfAny();
 
-        requisition.Status = newStatus;
-        requisition.BudgetDecision = newDecision;
-        requisition.PositionsFilled = newFilled;
-        await _requisitionRepository.SaveChangesAsync();
+        var carriesOutTermination = isTermination && requisition.Status != RequisitionStatus.Completed &&
+                                    newStatus == RequisitionStatus.Completed;
 
+        requisition.Status = newStatus;
+        if (!isTermination)
+        {
+            requisition.BudgetDecision = newDecision;
+            requisition.PositionsFilled = newFilled;
+        }
+        if (carriesOutTermination)
+            await _terminationService.ApplyAsync(requisition);
+
+        await _requisitionRepository.SaveChangesAsync();
         return requisition.ToDto();
+    }
+
+    private async Task<Requisition> BuildHireAsync(CreateRequisitionRequest request, string idempotencyKey)
+    {
+        var errors = new ValidationErrors();
+        errors.Required("departmentCode", request.DepartmentCode, 10);
+        errors.Required("roleTitle", request.RoleTitle);
+        errors.Required("positions", request.Positions);
+        errors.AddIf(request.Positions is < 1 or > MaxPositions, "positions", $"Positions must be between 1 and {MaxPositions}.");
+        errors.MaxLength("reasonCode", request.ReasonCode, 50);
+        errors.AddIf(request.StaffNumber != null, "staffNumber", "A Hire requisition does not name an existing employee.");
+
+        Department? department = null;
+        if (!string.IsNullOrWhiteSpace(request.DepartmentCode))
+        {
+            department = await _departmentRepository.GetByCodeAsync(request.DepartmentCode);
+            errors.AddIf(department == null, "departmentCode", $"Unknown department code '{request.DepartmentCode}'.");
+        }
+        errors.ThrowIfAny();
+
+        return new Requisition
+        {
+            RequisitionNumber = await _requisitionRepository.NextRequisitionNumberAsync(),
+            RequestingDeptId = department!.DepartmentId,
+            Type = RequisitionType.Hire,
+            RoleTitle = request.RoleTitle!.Trim(),
+            Positions = request.Positions!.Value,
+            PositionsFilled = 0,
+            Status = RequisitionStatus.Received,
+            ReasonCode = Text.TrimToNull(request.ReasonCode),
+            IdempotencyKey = idempotencyKey,
+            CreatedAtUtc = _clock.UtcNow,
+        };
+    }
+
+    private async Task<Requisition> BuildTerminationAsync(CreateRequisitionRequest request, string idempotencyKey)
+    {
+        var errors = new ValidationErrors();
+        errors.Required("staffNumber", request.StaffNumber, StaffNumber.Length);
+        errors.Required("reasonCode", request.ReasonCode, 50);
+        errors.MaxLength("roleTitle", request.RoleTitle, 100);
+        errors.AddIf(request.Positions is not (null or 1), "positions", "A Termination requisition always concerns exactly 1 employee.");
+
+        Staff? staff = null;
+        if (!string.IsNullOrWhiteSpace(request.StaffNumber))
+        {
+            staff = await _staffRepository.GetByNumberAsync(request.StaffNumber.Trim(), withDetails: true);
+            errors.AddIf(staff == null, "staffNumber", $"Unknown staff number '{request.StaffNumber}'.");
+            errors.AddIf(staff?.EmploymentStatus == EmploymentStatus.Terminated, "staffNumber", "This employee is already terminated.");
+        }
+
+        Department? department = staff?.HomeDepartment;
+        if (!string.IsNullOrWhiteSpace(request.DepartmentCode))
+        {
+            department = await _departmentRepository.GetByCodeAsync(request.DepartmentCode);
+            errors.AddIf(department == null, "departmentCode", $"Unknown department code '{request.DepartmentCode}'.");
+        }
+        errors.ThrowIfAny();
+
+        if (await _requisitionRepository.HasOpenTerminationAsync(staff!.StaffId))
+            throw new ConflictException($"{staff.StaffNumber} already has an open termination requisition.");
+
+        var today = _clock.Today;
+        var currentRole = staff.Assignments.Where(a => a.IsCurrentOn(today)).OrderByDescending(a => a.StartDate).FirstOrDefault()?.RoleTitle;
+        return new Requisition
+        {
+            RequisitionNumber = await _requisitionRepository.NextRequisitionNumberAsync(),
+            RequestingDeptId = department!.DepartmentId,
+            StaffId = staff.StaffId,
+            Type = RequisitionType.Termination,
+            RoleTitle = Text.TrimToNull(request.RoleTitle) ?? currentRole ?? "Employee",
+            Positions = 1,
+            PositionsFilled = 0,
+            Status = RequisitionStatus.Received,
+            ReasonCode = request.ReasonCode!.Trim(),
+            IdempotencyKey = idempotencyKey,
+            CreatedAtUtc = _clock.UtcNow,
+        };
     }
 
     private static CreateResult Replay(Requisition original, CreateRequisitionRequest request, string idempotencyKey)
     {
-        var samePayload =
-            (request.Type ?? RequisitionType.Hire) == original.Type &&
-            string.Equals(request.DepartmentCode?.Trim(), original.RequestingDepartment.Code, StringComparison.OrdinalIgnoreCase) &&
-            request.RoleTitle?.Trim() == original.RoleTitle &&
-            request.Positions == original.Positions &&
-            Text.TrimToNull(request.ReasonCode) == original.ReasonCode;
+        static bool SameText(string? sent, string? stored) =>
+            string.Equals(Text.TrimToNull(sent), stored, StringComparison.OrdinalIgnoreCase);
+
+        var type = request.Type ?? RequisitionType.Hire;
+        var samePayload = type == original.Type && (type == RequisitionType.Hire
+            ? SameText(request.DepartmentCode, original.RequestingDepartment.Code) &&
+              request.RoleTitle?.Trim() == original.RoleTitle &&
+              request.Positions == original.Positions &&
+              Text.TrimToNull(request.ReasonCode) == original.ReasonCode
+            : SameText(request.StaffNumber, original.Staff?.StaffNumber) &&
+              Text.TrimToNull(request.ReasonCode) == original.ReasonCode &&
+              (request.DepartmentCode == null || SameText(request.DepartmentCode, original.RequestingDepartment.Code)) &&
+              (request.RoleTitle == null || request.RoleTitle.Trim() == original.RoleTitle) &&
+              request.Positions is null or 1);
 
         if (!samePayload)
             throw new ConflictException(

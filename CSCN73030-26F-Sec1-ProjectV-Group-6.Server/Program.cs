@@ -107,6 +107,7 @@ builder.Services.AddScoped<CredentialService>();
 builder.Services.AddScoped<AuditService>();
 builder.Services.AddScoped<SecurityFlagService>();
 builder.Services.AddScoped<EligibilityService>();
+builder.Services.AddScoped<TerminationService>();
 
 // ---- Integration events (transactional outbox) ----------------------------------------------
 builder.Services.Configure<MessagingOptions>(builder.Configuration.GetSection(MessagingOptions.Section));
