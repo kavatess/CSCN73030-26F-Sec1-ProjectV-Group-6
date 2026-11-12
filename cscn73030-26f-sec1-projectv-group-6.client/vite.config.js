@@ -1,70 +1,36 @@
 import { fileURLToPath, URL } from 'node:url';
-
 import { defineConfig } from 'vite';
-import plugin from '@vitejs/plugin-react';
-import fs from 'fs';
-import path from 'path';
-import child_process from 'child_process';
-import { env } from 'process';
+import react from '@vitejs/plugin-react';
+import fs from 'node:fs';
+import path from 'node:path';
+import childProcess from 'node:child_process';
+import { env, platform } from 'node:process';
 
-const baseFolder =
-    env.APPDATA !== undefined && env.APPDATA !== ''
-        ? `${env.APPDATA}/ASP.NET/https`
-        : `${env.HOME}/.aspnet/https`;
-
-const certificateName = "cscn73030-26f-sec1-projectv-group-6.client";
-const certFilePath = path.join(baseFolder, `${certificateName}.pem`);
-const keyFilePath = path.join(baseFolder, `${certificateName}.key`);
-
-if (!fs.existsSync(baseFolder)) {
-    fs.mkdirSync(baseFolder, { recursive: true });
-}
-
-if (!fs.existsSync(certFilePath) || !fs.existsSync(keyFilePath)) {
-    if (0 !== child_process.spawnSync('dotnet', [
-        'dev-certs',
-        'https',
-        '--export-path',
-        certFilePath,
-        '--format',
-        'Pem',
-        '--no-password',
-    ], { stdio: 'inherit', }).status) {
-        throw new Error("Could not create certificate.");
+// Visual Studio uses HTTPS for its local development proxy. Builds, tests, and
+// standalone Vite development do not need a .NET development certificate.
+export default defineConfig(({ command }) => {
+  const useHttps = command === 'serve' && (platform === 'win32' || Boolean(env.ASPNETCORE_HTTPS_PORT));
+  let https;
+  if (useHttps) {
+    const folder = env.APPDATA
+      ? path.join(env.APPDATA, 'ASP.NET', 'https')
+      : path.join(env.HOME, '.aspnet', 'https');
+    const name = 'cscn73030-26f-sec1-projectv-group-6.client';
+    const cert = path.join(folder, name + '.pem');
+    const key = path.join(folder, name + '.key');
+    fs.mkdirSync(folder, { recursive: true });
+    if (!fs.existsSync(cert) || !fs.existsSync(key)) {
+      const result = childProcess.spawnSync('dotnet', ['dev-certs','https','--export-path',cert,'--format','Pem','--no-password'], { stdio:'inherit' });
+      if (result.status !== 0) throw new Error('Could not create certificate.');
     }
-}
-
-const target = env.ASPNETCORE_HTTPS_PORT ? `https://localhost:${env.ASPNETCORE_HTTPS_PORT}` :
-    env.ASPNETCORE_URLS ? env.ASPNETCORE_URLS.split(';')[0] : 'https://localhost:7038';
-
-// Top-level paths served by the Staff/HR API (see API.md).
-const apiPrefixes = [
-    'staff', 'departments', 'assignments', 'rosters', 'requisitions', 'credentials',
-    'headcounts', 'audit', 'health', 'openapi', 'weatherforecast'
-];
-
-// https://vitejs.dev/config/
-export default defineConfig({
-    plugins: [plugin()],
-    resolve: {
-        alias: {
-            '@': fileURLToPath(new URL('./src', import.meta.url))
-        }
-    },
-    server: {
-        // Forward API calls to the ASP.NET server. A browser navigation (Accept: text/html) to a
-        // path such as /staff is left to the React app, so client-side routes can share API paths.
-        proxy: {
-            [`^/(${apiPrefixes.join('|')})(/|\\?|$)`]: {
-                target,
-                secure: false,
-                bypass: (req) => (req.headers.accept?.includes('text/html') ? '/index.html' : undefined)
-            }
-        },
-        port: parseInt(env.DEV_SERVER_PORT || '54552'),
-        https: {
-            key: fs.readFileSync(keyFilePath),
-            cert: fs.readFileSync(certFilePath),
-        }
-    }
-})
+    https = { key:fs.readFileSync(key), cert:fs.readFileSync(cert) };
+  }
+  const target = env.ASPNETCORE_HTTPS_PORT
+    ? 'https://localhost:' + env.ASPNETCORE_HTTPS_PORT
+    : env.ASPNETCORE_URLS?.split(';')[0] || 'https://localhost:7038';
+  return {
+    plugins: [react()],
+    resolve: { alias: { '@':fileURLToPath(new URL('./src', import.meta.url)) } },
+    server: { proxy: { '^/weatherforecast': { target, secure:false } }, port:Number(env.DEV_SERVER_PORT || 54552), ...(https ? { https } : {}) },
+  };
+});
