@@ -23,6 +23,34 @@ namespace CSCN73030_26F_Sec1_ProjectV_Group_6.Server.Tests.Api
                     new CreateCredentialRequest(typeId, "FAKE-T-" + Guid.NewGuid().ToString("N")[..6], Today.AddYears(-1), Today.AddDays(expiresInDays))),
                 HttpStatusCode.Created);
 
+        // ---- GET /credentials/types ---------------------------------------------------------------------------
+
+        [Fact]
+        public async Task Types_ListsTheTwelveSeededTypesByName()
+        {
+            var types = await GetAsync<List<CredentialTypeDto>>("/credentials/types");
+
+            Assert.Equal(12, types.Count);
+            Assert.Equal(types.OrderBy(t => t.Name, StringComparer.OrdinalIgnoreCase).Select(t => t.Name), types.Select(t => t.Name));
+            var pcp = types.Single(t => t.CredentialTypeId == Seed.PrimaryCareParamedicLicence);
+            Assert.Equal("Primary Care Paramedic Licence", pcp.Name);
+            Assert.True(pcp.IsDutyBlocking);
+            Assert.False(types.Single(t => t.CredentialTypeId == Seed.CertifiedHrProfessional).IsDutyBlocking);
+        }
+
+        [Fact]
+        public async Task Types_IdsWorkForCreatingACredential()
+        {
+            var staff = await CreateStaffAsync();
+            var type = (await GetAsync<List<CredentialTypeDto>>("/credentials/types")).First(t => t.Name.StartsWith("CPR"));
+
+            var credential = await ReadAsync<CredentialDto>(
+                await PostAsync($"/staff/{staff.StaffNumber}/credentials", new CreateCredentialRequest(type.CredentialTypeId, "FAKE-CPR", Today, Today.AddYears(1))),
+                HttpStatusCode.Created);
+
+            Assert.Equal(type.Name, credential.CredentialType);
+        }
+
         // ---- GET /credentials ---------------------------------------------------------------------------------
 
         [Theory]

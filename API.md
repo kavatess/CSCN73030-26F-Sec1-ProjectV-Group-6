@@ -296,6 +296,13 @@ Suspended whatever its date.
 `state` CredentialStatus, `type` credentialTypeId, `department` holder's home department code.
 Sorted by expiry date. `200` → `PagedResult<Credential>` · `400` · `422`
 
+### `GET /credentials/types`
+
+Every kind of credential, sorted by name. Use `credentialTypeId` when recording a credential or filtering
+`GET /credentials?type=`.
+
+`200` → `[{ "credentialTypeId": 1, "name": "Primary Care Paramedic Licence", "isDutyBlocking": true }, …]`
+
 ### `GET /credentials/expiring?withinDays=30`
 
 Not-yet-expired, non-suspended credentials expiring within `withinDays` (0–365, default 30), soonest first.

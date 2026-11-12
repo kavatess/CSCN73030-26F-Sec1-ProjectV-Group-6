@@ -71,3 +71,9 @@ public record CredentialDto(
     DateOnly ExpiryDate,
     CredentialStatus Status,
     int DaysUntilExpiry);
+
+/// <summary>A kind of credential, from GET /credentials/types.</summary>
+/// <param name="CredentialTypeId">Id to send as credentialTypeId.</param>
+/// <param name="Name">Display name, e.g. Primary Care Paramedic Licence.</param>
+/// <param name="IsDutyBlocking">When true, an expired or suspended credential of this type makes the holder ineligible for duty.</param>
+public record CredentialTypeDto(int CredentialTypeId, string Name, bool IsDutyBlocking);

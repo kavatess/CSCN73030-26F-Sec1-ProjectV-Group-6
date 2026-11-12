@@ -36,6 +36,12 @@ public class CredentialsController : ControllerBase
     public async Task<ActionResult<PagedResult<CredentialDto>>> Search([FromQuery] CredentialQuery query) =>
         await _credentialService.SearchAsync(query);
 
+    /// <summary>Every kind of credential. Use credentialTypeId when recording a credential or filtering by type.</summary>
+    [HttpGet("credentials/types")]
+    [ProducesResponseType<List<CredentialTypeDto>>(StatusCodes.Status200OK)]
+    public async Task<ActionResult<List<CredentialTypeDto>>> Types() =>
+        await _credentialService.ListTypesAsync();
+
     /// <summary>Credentials that have not expired yet but will within the given number of days. Suspended ones are excluded.</summary>
     /// <param name="withinDays">0 to 365. Defaults to 30.</param>
     [HttpGet("credentials/expiring")]

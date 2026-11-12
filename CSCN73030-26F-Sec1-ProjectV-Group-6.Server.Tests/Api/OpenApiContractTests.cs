@@ -20,7 +20,7 @@ namespace CSCN73030_26F_Sec1_ProjectV_Group_6.Server.Tests.Api
             "POST /staff/{staffNumber}/assignments", "GET /staff/{staffNumber}/assignments", "PATCH /assignments/{id}",
             "GET /rosters", "POST /rosters/entries", "DELETE /rosters/entries/{id}", "GET /rosters/headcount", "GET /rosters/on-duty",
             "POST /requisitions", "GET /requisitions", "GET /requisitions/{number}", "PATCH /requisitions/{number}",
-            "GET /credentials", "GET /credentials/expiring", "POST /staff/{staffNumber}/credentials", "PATCH /credentials/{id}",
+            "GET /credentials", "GET /credentials/types", "GET /credentials/expiring", "POST /staff/{staffNumber}/credentials", "PATCH /credentials/{id}",
         };
 
         private async Task<JsonElement> DocumentAsync()

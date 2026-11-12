@@ -35,6 +35,13 @@ public class CredentialService
     /// <summary>Largest withinDays accepted by the expiring list.</summary>
     public const int MaxWithinDays = 365;
 
+    /// <summary>Every kind of credential, with the id clients send as credentialTypeId.</summary>
+    public async Task<List<CredentialTypeDto>> ListTypesAsync()
+    {
+        var types = await _credentialRepository.ListTypesAsync();
+        return types.Select(t => new CredentialTypeDto(t.CredentialTypeId, t.Name, t.IsDutyBlocking)).ToList();
+    }
+
     /// <summary>Searches credentials city-wide, soonest expiry first.</summary>
     /// <param name="query">State, type, department and paging.</param>
     /// <exception cref="Errors.ValidationFailedException">A field breaks a rule (422).</exception>

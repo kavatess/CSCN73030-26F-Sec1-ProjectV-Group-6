@@ -63,6 +63,10 @@ public class CredentialRepository
     public Task<Credential?> GetByIdAsync(int credentialId) =>
         WithDetails(_db.Credentials).SingleOrDefaultAsync(c => c.CredentialId == credentialId);
 
+    /// <summary>Every credential type, ordered by name.</summary>
+    public Task<List<CredentialType>> ListTypesAsync() =>
+        _db.CredentialTypes.OrderBy(t => t.Name).AsNoTracking().ToListAsync();
+
     /// <summary>Finds a credential type by id.</summary>
     /// <param name="credentialTypeId">Credential type id.</param>
     public Task<CredentialType?> GetTypeAsync(int credentialTypeId) =>
