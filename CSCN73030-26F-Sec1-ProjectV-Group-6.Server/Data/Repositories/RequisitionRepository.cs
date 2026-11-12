@@ -28,7 +28,7 @@ public class RequisitionRepository
     /// <summary>Finds the requisition created with this Idempotency-Key, if any (rule 3).</summary>
     /// <param name="idempotencyKey">The header value.</param>
     public Task<Requisition?> GetByIdempotencyKeyAsync(string idempotencyKey) =>
-        WithDetails().SingleOrDefaultAsync(r => r.IdempotencyKey == idempotencyKey);
+        WithDetails().IgnoreQueryFilters().SingleOrDefaultAsync(r => r.IdempotencyKey == idempotencyKey); // keys are unique city-wide
 
     /// <summary>Requisitions matching the optional filters, newest first.</summary>
     /// <param name="type">Type to match, or null.</param>

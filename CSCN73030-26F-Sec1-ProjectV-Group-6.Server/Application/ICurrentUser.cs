@@ -13,4 +13,11 @@ public interface ICurrentUser
     /// unauthenticated request, or "system" outside a request (e.g. the seeder).
     /// </summary>
     string ActorId { get; }
+
+    /// <summary>
+    /// Department code the caller is limited to, or null for city-wide access. Set from the token's
+    /// "department" claim for callers without the StaffHr.Admin role; the database query filters then
+    /// hide staff (and their records) from other departments.
+    /// </summary>
+    string? DepartmentScope { get; }
 }

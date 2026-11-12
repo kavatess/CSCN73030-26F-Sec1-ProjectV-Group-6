@@ -32,7 +32,13 @@ Every endpoint except `GET /health` needs an **Entra ID access token** for the S
 | `StaffHr.Payroll` | Compensation and payroll headcount, the only endpoints with salary (payroll officers, the Budget service). `StaffHr.Admin` does **not** include it. |
 | `StaffHr.Audit.Read` | Read the audit log |
 
-Any role also grants read access. `401` = no, expired or invalid token; `403` = the token's roles do not allow the
+Any role also grants read access.
+
+**Department scope.** A token that carries a `department` claim (e.g. `"department": "PTR"` for Transport's
+service) is limited to that department unless it also has `StaffHr.Admin`: it sees only staff whose home department
+is PTR (and their assignments, shifts, credentials, pay and flags) and only requisitions PTR raised. Other staff
+answer `404` and headcounts for other departments show 0. Such a caller may only raise requisitions for its own
+department (`403` otherwise). Uniqueness checks (work email, Idempotency-Key) stay city-wide. `401` = no, expired or invalid token; `403` = the token's roles do not allow the
 request. Both are `application/problem+json`. In the Development environment no token is needed: every request is
 signed in as `dev-user` with all roles (headers `X-Dev-Roles`, `X-Dev-User`, `X-Dev-Anonymous` let you test others).
 
@@ -68,7 +74,7 @@ Every error is `application/problem+json`:
 | --- | --- | --- |
 | 400 | Malformed: unreadable JSON, wrong value type (incl. unknown enum value), empty body, missing `Idempotency-Key` | Present when the problem is in a field (`$.hireDate`, `pageSize`) |
 | 401 | No, expired or invalid access token | — |
-| 403 | The token's roles do not allow the request | — |
+| 403 | The token's roles do not allow the request, or a department-scoped caller acts for another department | — |
 | 404 | The resource in the URL doesn't exist | — |
 | 409 | Conflict: duplicate work email, `Idempotency-Key` reused with a different body, overlapping shift | — |
 | 422 | Well-formed but breaks a rule; one entry per invalid field | Always |

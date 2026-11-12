@@ -58,7 +58,7 @@ public class StaffRepository
     /// <param name="normalisedEmail">Lower-case, trimmed email.</param>
     /// <param name="exceptStaffId">Staff member to ignore (the one being updated).</param>
     public Task<bool> EmailInUseAsync(string normalisedEmail, int? exceptStaffId = null) =>
-        _db.Staff.AnyAsync(s => s.Email == normalisedEmail && s.StaffId != exceptStaffId);
+        _db.Staff.IgnoreQueryFilters().AnyAsync(s => s.Email == normalisedEmail && s.StaffId != exceptStaffId); // city-wide
 
     /// <summary>
     /// Takes the next value from the city-wide staff number sequence. SQL Server sequences never

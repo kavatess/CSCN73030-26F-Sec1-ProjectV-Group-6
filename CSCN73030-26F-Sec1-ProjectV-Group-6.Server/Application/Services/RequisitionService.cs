@@ -21,6 +21,7 @@ public class RequisitionService
     private readonly Clock _clock;
     private readonly StaffRepository _staffRepository;
     private readonly TerminationService _terminationService;
+    private readonly ICurrentUser _currentUser;
 
     /// <summary>Creates the RequisitionService. Dependencies are supplied by dependency injection.</summary>
     /// <param name="requisitionRepository">Requisition data access.</param>
@@ -28,9 +29,11 @@ public class RequisitionService
     /// <param name="clock">Current UTC time.</param>
     /// <param name="staffRepository">Staff lookups for termination requisitions.</param>
     /// <param name="terminationService">Carries out completed terminations.</param>
+    /// <param name="currentUser">The caller, for department scoping.</param>
     public RequisitionService(RequisitionRepository requisitionRepository, DepartmentRepository departmentRepository, Clock clock,
-        StaffRepository staffRepository, TerminationService terminationService)
+        StaffRepository staffRepository, TerminationService terminationService, ICurrentUser currentUser)
     {
+        _currentUser = currentUser;
         _staffRepository = staffRepository;
         _terminationService = terminationService;
         _requisitionRepository = requisitionRepository;
@@ -66,6 +69,12 @@ public class RequisitionService
         idempotencyKey = idempotencyKey.Trim();
         if (idempotencyKey.Length > MaxIdempotencyKeyLength)
             throw new BadRequestException($"The Idempotency-Key header must be at most {MaxIdempotencyKeyLength} characters.");
+
+        // A department-scoped caller may only raise requisitions for its own department.
+        var scope = _currentUser.DepartmentScope;
+        if (scope != null && (request.Type ?? RequisitionType.Hire) == RequisitionType.Hire &&
+            !string.Equals(request.DepartmentCode?.Trim(), scope, StringComparison.OrdinalIgnoreCase))
+            throw new ForbiddenException($"You can only raise requisitions for department {scope}.");
 
         var original = await _requisitionRepository.GetByIdempotencyKeyAsync(idempotencyKey);
         if (original != null)
@@ -239,6 +248,10 @@ public class RequisitionService
             errors.AddIf(department == null, "departmentCode", $"Unknown department code '{request.DepartmentCode}'.");
         }
         errors.ThrowIfAny();
+
+        var scope = _currentUser.DepartmentScope;
+        if (scope != null && !string.Equals(department!.Code, scope, StringComparison.OrdinalIgnoreCase))
+            throw new ForbiddenException($"You can only raise requisitions for department {scope}.");
 
         if (await _requisitionRepository.HasOpenTerminationAsync(staff!.StaffId))
             throw new ConflictException($"{staff.StaffNumber} already has an open termination requisition.");

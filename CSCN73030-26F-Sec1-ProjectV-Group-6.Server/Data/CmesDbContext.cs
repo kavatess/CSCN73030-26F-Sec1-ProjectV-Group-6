@@ -3,6 +3,7 @@
  * @brief EF Core database context for the Staff/HR service.
  */
 
+using CSCN73030_26F_Sec1_ProjectV_Group_6.Server.Application;
 using CSCN73030_26F_Sec1_ProjectV_Group_6.Server.Domain;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
@@ -12,11 +13,21 @@ namespace CSCN73030_26F_Sec1_ProjectV_Group_6.Server.Data;
 /// <summary>EF Core context for the Staff/HR database. Table mappings live in Data/Configurations.</summary>
 public class CmesDbContext : DbContext
 {
+    private readonly ICurrentUser? _currentUser;
+
     /// <summary>Creates the context. Options (the SQL Server connection) come from Program.cs.</summary>
     /// <param name="options">Provider and connection settings.</param>
-    public CmesDbContext(DbContextOptions<CmesDbContext> options) : base(options)
+    /// <param name="currentUser">The caller, for department-scoped query filters. Null means unscoped.</param>
+    public CmesDbContext(DbContextOptions<CmesDbContext> options, ICurrentUser? currentUser = null) : base(options)
     {
+        _currentUser = currentUser;
     }
+
+    /// <summary>
+    /// Department code this context is limited to, or null for city-wide. Read by the global query
+    /// filters on every query (EF Core re-evaluates it per query, so it follows the current caller).
+    /// </summary>
+    public string? DepartmentScope => _currentUser?.DepartmentScope;
 
     /// <summary>City-wide sequence behind STF-0000000 staff numbers. Values are never reused.</summary>
     public const string StaffNumberSequence = "StaffNumberSequence";
@@ -57,6 +68,23 @@ public class CmesDbContext : DbContext
         modelBuilder.HasSequence<long>(RequisitionNumberSequence).StartsAt(1).IncrementsBy(1);
 
         modelBuilder.ApplyConfigurationsFromAssembly(typeof(CmesDbContext).Assembly);
+        ApplyDepartmentScope(modelBuilder);
+    }
+
+    /// <summary>
+    /// Row-level security: a department-scoped caller sees only staff whose home department is theirs,
+    /// those staff's assignments, shifts, credentials, pay and flags, and requisitions raised by their
+    /// department. Use IgnoreQueryFilters() only for city-wide checks such as email uniqueness.
+    /// </summary>
+    private void ApplyDepartmentScope(ModelBuilder modelBuilder)
+    {
+        modelBuilder.Entity<Staff>().HasQueryFilter(s => DepartmentScope == null || s.HomeDepartment.Code == DepartmentScope);
+        modelBuilder.Entity<StaffAssignment>().HasQueryFilter(a => DepartmentScope == null || a.Staff.HomeDepartment.Code == DepartmentScope);
+        modelBuilder.Entity<RosterEntry>().HasQueryFilter(r => DepartmentScope == null || r.Staff.HomeDepartment.Code == DepartmentScope);
+        modelBuilder.Entity<Credential>().HasQueryFilter(c => DepartmentScope == null || c.Staff.HomeDepartment.Code == DepartmentScope);
+        modelBuilder.Entity<Compensation>().HasQueryFilter(c => DepartmentScope == null || c.Staff.HomeDepartment.Code == DepartmentScope);
+        modelBuilder.Entity<SecurityFlag>().HasQueryFilter(f => DepartmentScope == null || f.Staff.HomeDepartment.Code == DepartmentScope);
+        modelBuilder.Entity<Requisition>().HasQueryFilter(r => DepartmentScope == null || r.RequestingDepartment.Code == DepartmentScope);
     }
 
     /// <summary>Stores enums as strings and marks every DateTime read back from the database as UTC.</summary>

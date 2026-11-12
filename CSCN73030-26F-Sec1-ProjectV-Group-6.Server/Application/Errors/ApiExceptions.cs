@@ -39,6 +39,17 @@ public class BadRequestException : ApiException
     }
 }
 
+/// <summary>403: the caller is signed in but may not do this (e.g. act for another department).</summary>
+public class ForbiddenException : ApiException
+{
+    /// <summary>Creates a 403 error.</summary>
+    /// <param name="detail">Why the request is not allowed.</param>
+    public ForbiddenException(string detail)
+        : base(StatusCodes.Status403Forbidden, "Forbidden", detail)
+    {
+    }
+}
+
 /// <summary>404: the resource in the URL does not exist.</summary>
 public class NotFoundException : ApiException
 {

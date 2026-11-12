@@ -5,6 +5,7 @@
 
 using System.Security.Claims;
 using CSCN73030_26F_Sec1_ProjectV_Group_6.Server.Application;
+using CSCN73030_26F_Sec1_ProjectV_Group_6.Server.Infrastructure.Auth;
 
 namespace CSCN73030_26F_Sec1_ProjectV_Group_6.Server.Infrastructure;
 
@@ -24,6 +25,18 @@ public class HttpCurrentUser : ICurrentUser
     public HttpCurrentUser(IHttpContextAccessor httpContextAccessor)
     {
         _httpContextAccessor = httpContextAccessor;
+    }
+
+    /// <summary>The "department" claim of a non-admin caller, upper-cased; null otherwise or outside a request.</summary>
+    public string? DepartmentScope
+    {
+        get
+        {
+            var user = _httpContextAccessor.HttpContext?.User;
+            if (user?.Identity?.IsAuthenticated != true || user.IsInRole(StaffHrRoles.Admin)) return null;
+            var department = user.FindFirstValue(StaffHrClaims.Department);
+            return string.IsNullOrWhiteSpace(department) ? null : department.Trim().ToUpperInvariant();
+        }
     }
 
     /// <summary>
