@@ -1,0 +1,25 @@
+name: Validate infrastructure
+
+# Compiles the Bicep templates (catches syntax, type and API-version errors) without deploying anything.
+on:
+  push:
+    paths:
+      - 'infra/**'
+      - '.github/workflows/infra-validate.yml'
+  workflow_dispatch:
+
+jobs:
+  bicep:
+    name: Bicep build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build infra/main.bicep
+        run: |
+          az bicep install
+          az bicep build --file infra/main.bicep --stdout > /dev/null
+          echo "infra/main.bicep compiles."
+
+      - name: Check the parameters file is valid JSON
+        run: jq empty infra/main.parameters.json infra/entra-app-roles.json

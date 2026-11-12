@@ -1,0 +1,78 @@
+{
+  "appRoles": [
+    {
+      "allowedMemberTypes": [
+        "User"
+      ],
+      "description": "HR staff: create and change staff, assignments, credentials and requisitions; read audit and security flags.",
+      "displayName": "HR administrator",
+      "id": "e38611ef-721a-5e39-b5ee-91a36effddfd",
+      "isEnabled": true,
+      "value": "StaffHr.Admin"
+    },
+    {
+      "allowedMemberTypes": [
+        "User",
+        "Application"
+      ],
+      "description": "Read staff, departments, rosters, credentials, requisitions and eligibility.",
+      "displayName": "Staff/HR reader",
+      "id": "a0c8a521-ef46-585f-acfb-47be2d2e91b8",
+      "isEnabled": true,
+      "value": "StaffHr.Read"
+    },
+    {
+      "allowedMemberTypes": [
+        "User",
+        "Application"
+      ],
+      "description": "Add and remove roster entries.",
+      "displayName": "Roster scheduler",
+      "id": "1d80f0db-6826-5b93-a2f8-15f5239d28e2",
+      "isEnabled": true,
+      "value": "StaffHr.Rosters.Write"
+    },
+    {
+      "allowedMemberTypes": [
+        "User",
+        "Application"
+      ],
+      "description": "Raise hire and termination requisitions.",
+      "displayName": "Requisition submitter",
+      "id": "864115c4-9d51-5700-a197-e32fa6aed1c3",
+      "isEnabled": true,
+      "value": "StaffHr.Requisitions.Submit"
+    },
+    {
+      "allowedMemberTypes": [
+        "Application"
+      ],
+      "description": "The Security service: sync and read security flags.",
+      "displayName": "Security flag sync",
+      "id": "217c88a5-c9b8-5e79-b147-dcffa7ab35aa",
+      "isEnabled": true,
+      "value": "StaffHr.SecurityFlags.Write"
+    },
+    {
+      "allowedMemberTypes": [
+        "User",
+        "Application"
+      ],
+      "description": "Payroll officers and the Budget service: compensation and payroll headcount (salary).",
+      "displayName": "Payroll",
+      "id": "814ded3f-cab0-5d9c-8bce-9bea9550d6ed",
+      "isEnabled": true,
+      "value": "StaffHr.Payroll"
+    },
+    {
+      "allowedMemberTypes": [
+        "User"
+      ],
+      "description": "Read the audit log.",
+      "displayName": "Auditor",
+      "id": "ecddf18a-de6f-5a32-b162-1500649677b3",
+      "isEnabled": true,
+      "value": "StaffHr.Audit.Read"
+    }
+  ]
+}

@@ -1,0 +1,90 @@
+name: Deploy to Azure
+
+# Manual: Actions tab > "Deploy to Azure" > Run workflow. See docs/DEPLOYMENT.md for the one-time setup
+# (resource group, Entra ID app registration, federated credential and the repository secrets below).
+on:
+  workflow_dispatch:
+    inputs:
+      resource_group:
+        description: Azure resource group to deploy into
+        required: true
+        default: cmes-staffhr-rg
+
+permissions:
+  id-token: write   # OIDC sign-in to Azure, no stored Azure password
+  contents: read
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    environment: production
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 10.0.x
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Sign in to Azure
+        uses: azure/login@v2
+        with:
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+
+      - name: Provision infrastructure (Bicep)
+        id: infra
+        run: |
+          outputs=$(az deployment group create \
+            --resource-group "${{ inputs.resource_group }}" \
+            --template-file infra/main.bicep \
+            --parameters infra/main.parameters.json \
+            --parameters sqlAdminPassword="${{ secrets.SQL_ADMIN_PASSWORD }}" \
+                         entraClientId="${{ secrets.STAFFHR_API_CLIENT_ID }}" \
+            --query properties.outputs -o json)
+          echo "web_app=$(echo "$outputs" | jq -r .webAppName.value)" >> "$GITHUB_OUTPUT"
+          echo "key_vault=$(echo "$outputs" | jq -r .keyVaultName.value)" >> "$GITHUB_OUTPUT"
+          echo "sql_server=$(echo "$outputs" | jq -r .sqlServerName.value)" >> "$GITHUB_OUTPUT"
+          echo "web_url=$(echo "$outputs" | jq -r .webAppUrl.value)" >> "$GITHUB_OUTPUT"
+
+      - name: Build the app and the migration bundle
+        run: |
+          dotnet tool restore
+          dotnet publish CSCN73030-26F-Sec1-ProjectV-Group-6.Server -c Release -o publish
+          dotnet ef migrations bundle --project CSCN73030-26F-Sec1-ProjectV-Group-6.Server \
+            --configuration Release --self-contained -r linux-x64 -o efbundle --force
+
+      - name: Apply database migrations
+        run: |
+          runner_ip=$(curl -s https://api.ipify.org)
+          az sql server firewall-rule create -g "${{ inputs.resource_group }}" -s "${{ steps.infra.outputs.sql_server }}" \
+            -n github-runner --start-ip-address "$runner_ip" --end-ip-address "$runner_ip"
+          connection=$(az keyvault secret show --vault-name "${{ steps.infra.outputs.key_vault }}" \
+            --name ConnectionStrings--StaffHr --query value -o tsv)
+          echo "::add-mask::$connection"
+          ./efbundle --connection "$connection"
+
+      - name: Remove the temporary SQL firewall rule
+        if: always()
+        run: |
+          az sql server firewall-rule delete -g "${{ inputs.resource_group }}" -s "${{ steps.infra.outputs.sql_server }}" \
+            -n github-runner || true
+
+      - name: Deploy the app
+        uses: azure/webapps-deploy@v3
+        with:
+          app-name: ${{ steps.infra.outputs.web_app }}
+          package: publish
+
+      - name: Smoke test
+        run: |
+          for attempt in 1 2 3 4 5 6; do
+            status=$(curl -s -o /dev/null -w '%{http_code}' "${{ steps.infra.outputs.web_url }}/health")
+            [ "$status" = "200" ] && echo "Healthy" && exit 0
+            sleep 20
+          done
+          echo "Health check returned $status" && exit 1
