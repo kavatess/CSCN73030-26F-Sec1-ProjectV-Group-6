@@ -37,6 +37,12 @@ if (!fs.existsSync(certFilePath) || !fs.existsSync(keyFilePath)) {
 const target = env.ASPNETCORE_HTTPS_PORT ? `https://localhost:${env.ASPNETCORE_HTTPS_PORT}` :
     env.ASPNETCORE_URLS ? env.ASPNETCORE_URLS.split(';')[0] : 'https://localhost:7038';
 
+// Top-level paths served by the Staff/HR API (see API.md).
+const apiPrefixes = [
+    'staff', 'departments', 'assignments', 'rosters', 'requisitions', 'credentials',
+    'headcounts', 'audit', 'health', 'openapi', 'weatherforecast'
+];
+
 // https://vitejs.dev/config/
 export default defineConfig({
     plugins: [plugin()],
@@ -46,10 +52,13 @@ export default defineConfig({
         }
     },
     server: {
+        // Forward API calls to the ASP.NET server. A browser navigation (Accept: text/html) to a
+        // path such as /staff is left to the React app, so client-side routes can share API paths.
         proxy: {
-            '^/weatherforecast': {
+            [`^/(${apiPrefixes.join('|')})(/|\\?|$)`]: {
                 target,
-                secure: false
+                secure: false,
+                bypass: (req) => (req.headers.accept?.includes('text/html') ? '/index.html' : undefined)
             }
         },
         port: parseInt(env.DEV_SERVER_PORT || '54552'),
