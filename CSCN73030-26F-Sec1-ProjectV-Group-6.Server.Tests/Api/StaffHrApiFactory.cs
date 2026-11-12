@@ -3,6 +3,7 @@
  * @brief Boots the real API against a fresh, seeded SQL Server database for the API regression tests.
  */
 
+using CSCN73030_26F_Sec1_ProjectV_Group_6.Server.Application.Events;
 using CSCN73030_26F_Sec1_ProjectV_Group_6.Server.Data;
 using CSCN73030_26F_Sec1_ProjectV_Group_6.Server.Data.Seeding;
 using Microsoft.AspNetCore.Hosting;
@@ -39,6 +40,9 @@ namespace CSCN73030_26F_Sec1_ProjectV_Group_6.Server.Tests.Api
 
         private MsSqlContainer? _container;
         private string _connectionString = "";
+
+        /// <summary>Captures every integration event the app publishes, in place of Service Bus.</summary>
+        public RecordingEventPublisher Events { get; } = new();
 
         /// <summary>The fake clock injected in place of <see cref="TimeProvider.System"/>.</summary>
         public FakeTimeProvider Time { get; } = new(Now);
@@ -83,10 +87,14 @@ namespace CSCN73030_26F_Sec1_ProjectV_Group_6.Server.Tests.Api
         {
             builder.UseEnvironment("Development");
             builder.UseSetting("ConnectionStrings:StaffHr", _connectionString);
+            // Tests run the outbox dispatcher themselves, so the background loop stays off.
+            builder.UseSetting("Messaging:BackgroundPublishing", "false");
             builder.ConfigureServices(services =>
             {
                 services.RemoveAll<TimeProvider>();
                 services.AddSingleton<TimeProvider>(Time);
+                services.RemoveAll<IEventPublisher>();
+                services.AddSingleton<IEventPublisher>(Events);
             });
         }
     }

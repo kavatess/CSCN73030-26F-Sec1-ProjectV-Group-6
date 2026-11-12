@@ -339,3 +339,34 @@ Newest first. `entityId` is the public id: a staff number, a requisition number 
 `200` → `PagedResult<{ auditId, entityType, entityId, action, actorId, timestampUtc }>` · `400` · `422`
 
 `action` is `Created`, `Updated` or `Deleted`.
+
+## Integration events (Azure Service Bus)
+
+Staff/HR publishes events to the Service Bus topic **`staff-events`**. Each message is:
+
+| Message field | Value |
+| --- | --- |
+| `MessageId` | The event id (a GUID). Enable duplicate detection on your subscription: delivery is at-least-once. |
+| `Subject` | The event type, e.g. `Staff.Onboarded`. Filter your subscription on it. |
+| `ContentType` | `application/json`; the body is the payload below. |
+| Application properties | `eventType`, `schemaVersion` (currently 1), `occurredAtUtc`, `source` = `staff-hr` |
+
+Events are written to an outbox table in the same transaction as the change, then published in the order they
+happened. An event therefore exists only if its change was committed.
+
+### `Staff.Onboarded`
+
+Sent when `POST /staff` succeeds. Contains no date of birth, citizen id or salary.
+
+```json
+{
+  "staffNumber": "STF-0000021", "firstName": "Avery", "lastName": "Quillfeather", "displayName": "Ave Quillfeather",
+  "email": "avery.quillfeather@cmes.example", "departmentCode": "EMS", "employmentType": "FullTime",
+  "employmentStatus": "Probation", "hireDate": "2026-11-02", "serviceId": 1, "roleTitle": "Primary Care Paramedic"
+}
+```
+
+`serviceId` and `roleTitle` are `null` when no initial assignment was given.
+
+Configuration (section `Messaging`): set `ServiceBus:FullyQualifiedNamespace` (managed identity) or
+`ServiceBus:ConnectionString`. With neither set, events are written to the application log instead.

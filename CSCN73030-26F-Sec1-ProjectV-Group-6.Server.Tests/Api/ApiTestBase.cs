@@ -7,7 +7,12 @@ using System.Net;
 using System.Net.Http.Json;
 using System.Text.Json;
 using System.Text.Json.Serialization;
+using CSCN73030_26F_Sec1_ProjectV_Group_6.Server.Application.Events;
 using CSCN73030_26F_Sec1_ProjectV_Group_6.Server.Contracts;
+using CSCN73030_26F_Sec1_ProjectV_Group_6.Server.Data;
+using CSCN73030_26F_Sec1_ProjectV_Group_6.Server.Domain;
+using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.DependencyInjection;
 
 namespace CSCN73030_26F_Sec1_ProjectV_Group_6.Server.Tests.Api
 {
@@ -148,6 +153,34 @@ namespace CSCN73030_26F_Sec1_ProjectV_Group_6.Server.Tests.Api
                     Assert.True(errors.TryGetProperty(field, out _), $"Expected an error for '{field}' in {errors}");
             }
             return problem;
+        }
+
+        /// <summary>Publishes every pending outbox event, as the background publisher would.</summary>
+        /// <returns>How many events were published.</returns>
+        protected async Task<int> DispatchOutboxAsync()
+        {
+            var total = 0;
+            int published;
+            do
+            {
+                using var scope = Factory.Services.CreateScope();
+                published = await scope.ServiceProvider.GetRequiredService<OutboxDispatcher>().DispatchPendingAsync();
+                total += published;
+            }
+            while (published > 0);
+            return total;
+        }
+
+        /// <summary>The outbox rows whose payload mentions <paramref name="staffNumber"/>.</summary>
+        /// <param name="staffNumber">STF-0000000.</param>
+        protected async Task<List<OutboxEvent>> OutboxEventsForAsync(string staffNumber)
+        {
+            using var scope = Factory.Services.CreateScope();
+            var db = scope.ServiceProvider.GetRequiredService<CmesDbContext>();
+            return await db.OutboxEvents.AsNoTracking()
+                .Where(e => e.PayloadJson.Contains(staffNumber))
+                .OrderBy(e => e.OccurredAtUtc)
+                .ToListAsync();
         }
 
         /// <summary>The service id of a service, looked up through the API.</summary>

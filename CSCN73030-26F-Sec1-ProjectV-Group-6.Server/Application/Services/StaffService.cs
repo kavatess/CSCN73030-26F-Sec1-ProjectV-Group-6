@@ -4,6 +4,7 @@
  */
 
 using CSCN73030_26F_Sec1_ProjectV_Group_6.Server.Application.Errors;
+using CSCN73030_26F_Sec1_ProjectV_Group_6.Server.Application.Events;
 using CSCN73030_26F_Sec1_ProjectV_Group_6.Server.Application.Validation;
 using CSCN73030_26F_Sec1_ProjectV_Group_6.Server.Contracts;
 using CSCN73030_26F_Sec1_ProjectV_Group_6.Server.Data.Repositories;
@@ -17,13 +18,16 @@ public class StaffService
     private readonly StaffRepository _staffRepository;
     private readonly DepartmentRepository _departmentRepository;
     private readonly Clock _clock;
+    private readonly OutboxWriter _outbox;
 
     /// <summary>Creates the StaffService. Dependencies are supplied by dependency injection.</summary>
     /// <param name="staffRepository">Staff data access.</param>
     /// <param name="departmentRepository">Department and service data access.</param>
     /// <param name="clock">Current UTC time.</param>
-    public StaffService(StaffRepository staffRepository, DepartmentRepository departmentRepository, Clock clock)
+    /// <param name="outbox">Queues integration events in the same transaction.</param>
+    public StaffService(StaffRepository staffRepository, DepartmentRepository departmentRepository, Clock clock, OutboxWriter outbox)
     {
+        _outbox = outbox;
         _staffRepository = staffRepository;
         _departmentRepository = departmentRepository;
         _clock = clock;
@@ -119,6 +123,11 @@ public class StaffService
         }
 
         _staffRepository.Add(staff);
+        // Committed with the Staff row, so the event exists if and only if the hire does.
+        _outbox.Enqueue(IntegrationEventTypes.StaffOnboarded, new StaffOnboardedEvent(
+            staff.StaffNumber, staff.FirstName, staff.LastName, staff.DisplayName, staff.Email,
+            department.Code, staff.EmploymentType.ToString(), staff.EmploymentStatus.ToString(), staff.HireDate,
+            service?.ServiceId, staff.Assignments.FirstOrDefault()?.RoleTitle));
         await _staffRepository.SaveChangesAsync();
         await transaction.CommitAsync();
 

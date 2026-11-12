@@ -11,12 +11,14 @@ using System.Diagnostics;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using CSCN73030_26F_Sec1_ProjectV_Group_6.Server.Application;
+using CSCN73030_26F_Sec1_ProjectV_Group_6.Server.Application.Events;
 using CSCN73030_26F_Sec1_ProjectV_Group_6.Server.Application.Services;
 using CSCN73030_26F_Sec1_ProjectV_Group_6.Server.Data;
 using CSCN73030_26F_Sec1_ProjectV_Group_6.Server.Data.Auditing;
 using CSCN73030_26F_Sec1_ProjectV_Group_6.Server.Data.Repositories;
 using CSCN73030_26F_Sec1_ProjectV_Group_6.Server.Data.Seeding;
 using CSCN73030_26F_Sec1_ProjectV_Group_6.Server.Infrastructure;
+using CSCN73030_26F_Sec1_ProjectV_Group_6.Server.Infrastructure.Messaging;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.Infrastructure;
 using Microsoft.EntityFrameworkCore;
@@ -93,6 +95,7 @@ builder.Services.AddScoped<RosterRepository>();
 builder.Services.AddScoped<RequisitionRepository>();
 builder.Services.AddScoped<CredentialRepository>();
 builder.Services.AddScoped<AuditRepository>();
+builder.Services.AddScoped<OutboxRepository>();
 
 builder.Services.AddScoped<StaffService>();
 builder.Services.AddScoped<DepartmentService>();
@@ -101,6 +104,17 @@ builder.Services.AddScoped<RosterService>();
 builder.Services.AddScoped<RequisitionService>();
 builder.Services.AddScoped<CredentialService>();
 builder.Services.AddScoped<AuditService>();
+
+// ---- Integration events (transactional outbox) ----------------------------------------------
+builder.Services.Configure<MessagingOptions>(builder.Configuration.GetSection(MessagingOptions.Section));
+builder.Services.AddScoped<OutboxWriter>();
+builder.Services.AddScoped<OutboxDispatcher>();
+var messaging = builder.Configuration.GetSection(MessagingOptions.Section).Get<MessagingOptions>() ?? new MessagingOptions();
+if (messaging.ServiceBus.IsConfigured)
+    builder.Services.AddSingleton<IEventPublisher, ServiceBusEventPublisher>();
+else
+    builder.Services.AddSingleton<IEventPublisher, LoggingEventPublisher>();
+builder.Services.AddHostedService<OutboxPublisherService>();
 builder.Services.AddScoped<DatabaseSeeder>();
 
 var app = builder.Build();
