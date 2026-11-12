@@ -325,6 +325,34 @@ All required; `expiryDate` must be after `issueDate`. `201` → `Credential` · 
 At least one field. `suspended: true` suspends; `false` lifts the suspension.
 `200` → `Credential` · `400` · `404` · `422`
 
+## Duty eligibility
+
+### `GET /staff/{staffNumber}/eligibility?service=&at=`
+
+Whether a staff member may work a shift. Emergency Services, Security and Transport call this before rostering
+or dispatching someone. `service` (a serviceId) narrows the assignment check to that service; `at` (UTC) defaults to
+now and its date is used for assignments and credentials.
+
+```json
+{
+  "staffNumber": "STF-0000003", "eligible": false, "at": "2026-11-05T12:00:00Z", "serviceId": null,
+  "reasons": [ { "code": "CREDENTIAL_EXPIRED", "message": "CPR & First Aid Certificate FAKE-1005 expired on 2026-10-31." } ],
+  "warnings": []
+}
+```
+
+| Reason code | Meaning |
+| --- | --- |
+| `EMPLOYMENT_STATUS` | Status is OnLeave, Suspended or Terminated |
+| `NO_CURRENT_ASSIGNMENT` | No assignment covers the date (in `service`, if given) |
+| `CREDENTIAL_EXPIRED` | A duty-blocking credential (see `GET /credentials/types`) has expired |
+| `CREDENTIAL_SUSPENDED` | A duty-blocking credential is suspended |
+| `SECURITY_FLAG_ACTIVE` | The Security service has an Active flag on the person |
+
+Warning code `CREDENTIAL_EXPIRING`: a duty-blocking credential expires within 30 days. It does not block duty.
+
+`200` · `400` unreadable `at` · `404` unknown staff · `422` unknown service
+
 ## Security flags (sync from the Security service)
 
 The Security service pushes each flag change to Staff/HR. A flag is identified by staff member and flag type
