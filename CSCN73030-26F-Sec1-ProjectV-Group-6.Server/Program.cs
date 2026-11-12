@@ -97,6 +97,7 @@ builder.Services.AddScoped<CredentialRepository>();
 builder.Services.AddScoped<AuditRepository>();
 builder.Services.AddScoped<OutboxRepository>();
 builder.Services.AddScoped<SecurityFlagRepository>();
+builder.Services.AddScoped<CompensationRepository>();
 
 builder.Services.AddScoped<StaffService>();
 builder.Services.AddScoped<DepartmentService>();
@@ -108,6 +109,7 @@ builder.Services.AddScoped<AuditService>();
 builder.Services.AddScoped<SecurityFlagService>();
 builder.Services.AddScoped<EligibilityService>();
 builder.Services.AddScoped<TerminationService>();
+builder.Services.AddScoped<PayrollService>();
 
 // ---- Integration events (transactional outbox) ----------------------------------------------
 builder.Services.Configure<MessagingOptions>(builder.Configuration.GetSection(MessagingOptions.Section));

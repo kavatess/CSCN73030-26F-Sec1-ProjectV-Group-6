@@ -1,16 +1,17 @@
 /**
  * @file Compensation.cs
- * @brief Compensation entity (schema only in this release; never exposed).
+ * @brief Compensation entity: an employee's pay band and salary over time.
  */
 
 namespace CSCN73030_26F_Sec1_ProjectV_Group_6.Server.Domain;
 
 /// <summary>
-/// Pay band and salary history. Nothing in this release reads or writes this table; it exists
-/// so the schema is complete for the payroll work next sprint.
+/// One rate in an employee's pay history. Rates never overlap: setting a new rate closes the
+/// current one on the new rate's EffectiveFrom.
 /// </summary>
 /// @par Business rule 4
-/// Salary must never appear in any staff or search DTO.
+/// Salary never appears in any staff or search DTO; it is only returned by the payroll endpoints
+/// (compensation and payroll headcount), which are restricted to the payroll role.
 public class Compensation
 {
     /// <summary>Database key.</summary>
@@ -25,12 +26,12 @@ public class Compensation
     /// <summary>Pay band code.</summary>
     public string PayBand { get; set; } = "";
 
-    /// <summary>Annual salary. Never exposed by the API.</summary>
+    /// <summary>Annual salary in dollars. Only returned by the payroll endpoints.</summary>
     public decimal AnnualSalary { get; set; }
 
     /// <summary>First day this pay applies.</summary>
     public DateOnly EffectiveFrom { get; set; }
 
-    /// <summary>Last day this pay applies, or null if current.</summary>
+    /// <summary>First day this pay no longer applies (exclusive), or null while it is the current rate.</summary>
     public DateOnly? EffectiveTo { get; set; }
 }

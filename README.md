@@ -161,7 +161,7 @@ them into RFC 7807 responses, so controllers contain no error handling.
 | 1. Staff number `STF-0000000` from one sequence, in the same transaction, immutable, never reused | `Domain/StaffNumber.cs`, `StaffRepository.NextStaffNumberAsync`, `StaffService.CreateAsync` / `UpdateAsync`, `StaffConfiguration` (EF throws if it is modified) |
 | 2. Unique work email → 409 | Unique index in `StaffConfiguration`, check in `StaffService`, fallback in `ApiExceptionHandler` |
 | 3. `Idempotency-Key` on `POST /requisitions` | `RequisitionService.CreateAsync`, unique index in `RequisitionConfiguration` |
-| 4. No salary in any DTO | `Contracts/` has no salary fields; `Compensation` is never read |
+| 4. No salary in any staff or search DTO | Staff/search contracts have no salary fields; salary is returned only by `PayrollService` / `PayrollController` |
 | 5. Credential status derived on read; Suspended overrides | `Domain/CredentialStatusRules.cs` |
 | 6. Date ordering and no overlapping shifts | Service validation plus check constraints; overlap in `RosterRepository.FindOverlapAsync` |
 

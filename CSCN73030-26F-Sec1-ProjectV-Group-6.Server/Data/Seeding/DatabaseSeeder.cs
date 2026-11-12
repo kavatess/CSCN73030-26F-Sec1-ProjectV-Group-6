@@ -71,6 +71,7 @@ public class DatabaseSeeder
         SeedParamedicRoster(staff, services["Paramedic Service"]);
         await SeedRequisitionsAsync();
         SeedSecurityFlags(staff);
+        SeedCompensation(staff);
         await _db.SaveChangesAsync();
 
         await transaction.CommitAsync();
@@ -235,6 +236,44 @@ public class DatabaseSeeder
     }
 
     // ---- Credentials -----------------------------------------------------------------------
+
+    /// <summary>
+    /// A fictional pay rate for every employee from their hire date. Desmond has a raise on promotion;
+    /// Matteo's rate ended when he was terminated.
+    /// </summary>
+    private void SeedCompensation(Dictionary<string, Staff> staff)
+    {
+        var today = _clock.Today;
+        var pay = new (string Key, string Band, decimal Salary)[]
+        {
+            ("talia", "EMS-5", 98_000m), ("desmond", "EMS-4", 89_000m), ("priya", "EMS-3", 74_000m),
+            ("jonah", "EMS-3", 72_000m), ("ines", "EMS-2", 68_000m), ("kofi", "EMS-4", 88_000m),
+            ("wren", "EMS-1", 31_000m), ("rowan", "EMS-3", 79_000m), ("celeste", "SEC-3", 76_000m),
+            ("anders", "SEC-5", 104_000m), ("noor", "SEC-2", 61_000m), ("lucian", "PTR-2", 63_000m),
+            ("greta", "PTR-2", 65_000m), ("matteo", "PTR-2", 60_000m), ("saoirse", "MNT-3", 70_000m),
+            ("bram", "MNT-1", 48_000m), ("hollis", "BUD-4", 95_000m), ("ottilie", "RES-1", 34_000m),
+            ("ezra", "HRS-4", 86_000m), ("marisol", "HRS-2", 52_000m),
+        };
+
+        foreach (var (key, band, salary) in pay)
+        {
+            var person = staff[key];
+            var rate = new Compensation { Staff = person, PayBand = band, AnnualSalary = salary, EffectiveFrom = person.HireDate };
+            if (person.EmploymentStatus == EmploymentStatus.Terminated)
+                rate.EffectiveTo = today.AddMonths(-2).AddDays(1); // the day after his last day
+            _db.Compensations.Add(rate);
+        }
+
+        // Desmond was paid at the PCP rate until his promotion to ACP two years ago.
+        var desmond = staff["desmond"];
+        var promotedOn = today.AddYears(-2);
+        var current = _db.Compensations.Local.Single(c => c.Staff == desmond);
+        current.EffectiveFrom = promotedOn;
+        _db.Compensations.Add(new Compensation
+        {
+            Staff = desmond, PayBand = "EMS-3", AnnualSalary = 71_000m, EffectiveFrom = desmond.HireDate, EffectiveTo = promotedOn,
+        });
+    }
 
     /// <summary>Two flags as the Security service would send them: one in force, one already lifted.</summary>
     private void SeedSecurityFlags(Dictionary<string, Staff> staff)

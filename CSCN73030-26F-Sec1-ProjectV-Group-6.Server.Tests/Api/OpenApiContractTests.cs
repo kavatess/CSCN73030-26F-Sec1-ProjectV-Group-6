@@ -24,6 +24,7 @@ namespace CSCN73030_26F_Sec1_ProjectV_Group_6.Server.Tests.Api
             "GET /audit",
             "PUT /staff/{staffNumber}/security-flags/{flagType}", "GET /staff/{staffNumber}/security-flags", "GET /security-flags",
             "GET /staff/{staffNumber}/eligibility",
+            "PUT /staff/{staffNumber}/compensation", "GET /staff/{staffNumber}/compensation", "GET /headcounts/payroll",
         };
 
         private async Task<JsonElement> DocumentAsync()
@@ -90,23 +91,24 @@ namespace CSCN73030_26F_Sec1_ProjectV_Group_6.Server.Tests.Api
             Assert.True(header.GetProperty("required").GetBoolean());
         }
 
+        /// <summary>Business rule 4: salary appears only in the payroll schemas, never in staff or search ones.</summary>
         [Fact]
-        public async Task Document_NoSchemaExposesSalary()
+        public async Task Document_SalaryOnlyInPayrollSchemas()
         {
             var schemas = (await DocumentAsync()).GetProperty("components").GetProperty("schemas");
+            string[] payrollSchemas = ["CompensationDto", "SetCompensationRequest", "DepartmentPayrollDto", "PayrollHeadcountDto"];
 
-            // Descriptions may mention salary ("Never includes salary"); no schema or field may carry it.
-            var names = schemas.EnumerateObject().Select(s => s.Name).ToList();
-            foreach (var schema in schemas.EnumerateObject())
-            {
-                if (schema.Value.TryGetProperty("properties", out var properties))
-                    names.AddRange(properties.EnumerateObject().Select(p => p.Name));
-            }
+            var withSalary = schemas.EnumerateObject()
+                .Where(s => s.Value.TryGetProperty("properties", out var properties) &&
+                            properties.EnumerateObject().Any(p => p.Name.Contains("salary", StringComparison.OrdinalIgnoreCase) ||
+                                                                  p.Name.Contains("payBand", StringComparison.OrdinalIgnoreCase)))
+                .Select(s => s.Name)
+                .ToList();
 
-            Assert.NotEmpty(names);
-            Assert.DoesNotContain(names, n => n.Contains("salary", StringComparison.OrdinalIgnoreCase));
-            Assert.DoesNotContain(names, n => n.Contains("payBand", StringComparison.OrdinalIgnoreCase));
-            Assert.DoesNotContain(names, n => n.Contains("compensation", StringComparison.OrdinalIgnoreCase));
+            Assert.NotEmpty(withSalary);
+            Assert.All(withSalary, name => Assert.Contains(name, payrollSchemas));
+            foreach (var staffSchema in new[] { "StaffProfileDto", "StaffSummaryDto", "CreateStaffRequest", "UpdateStaffRequest" })
+                Assert.DoesNotContain(staffSchema, withSalary);
         }
 
         [Fact]

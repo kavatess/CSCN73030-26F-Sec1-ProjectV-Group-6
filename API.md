@@ -14,7 +14,7 @@ Contract for review by the other CMES groups. The live, always-current version i
 - **Department code** (`EMS`, `SEC`, `PTR`, `MNT`, `BUD`, `RES`, `HRS`) is the public key for a department and is
   case-insensitive. **`serviceId`** (an integer, from `GET /departments/{code}/services`) identifies a service.
 - **PATCH** bodies are partial: omit a field (or send `null`) to leave it unchanged.
-- **Salary is never returned** by any endpoint.
+- **Salary is never returned** by staff or search endpoints. Only the payroll endpoints (restricted to the payroll role) return it.
 
 ### Enums
 
@@ -409,6 +409,44 @@ Errors: `400` unknown status · `404` unknown staff · `422` invalid flag type o
 ### `GET /security-flags?status=&flagType=`
 
 Most recently changed first, e.g. `?status=Active` to reconcile with the Security service. `200` → `SecurityFlag[]` · `400`
+
+## Payroll (salary: payroll role only)
+
+These are the only endpoints that return salary. Rates form a history that never overlaps: `effectiveTo` is
+**exclusive** (the first day the rate no longer applies) and is `null` for the current rate.
+
+### `PUT /staff/{staffNumber}/compensation`
+
+```json
+{ "payBand": "EMS-4", "annualSalary": 89000.00, "effectiveFrom": "2026-12-01" }
+```
+
+All required. Records a new rate and closes the current one on `effectiveFrom`. The same `effectiveFrom` as the
+current rate corrects it. `effectiveFrom` may not be before the current rate's start or the hire date; `annualSalary`
+is more than 0 and at most 1,000,000. Terminated employees get no new pay.
+
+`200` → the pay history, newest first: `[{ compensationId, staffNumber, payBand, annualSalary, effectiveFrom, effectiveTo }]`
+· `400` · `404` · `422`
+
+### `GET /staff/{staffNumber}/compensation`
+
+Pay history, newest first. `200` · `404`
+
+### `GET /headcounts/payroll?asOf=`
+
+For the Budget service. `asOf` (a date) defaults to today. On payroll means hired by `asOf` and not terminated.
+
+```json
+{
+  "asOf": "2026-11-05",
+  "departments": [ { "code": "EMS", "name": "Emergency Services", "headcount": 8, "fullTime": 7, "partTime": 1,
+                     "totalAnnualSalary": 599000.00, "averageAnnualSalary": 74875.00, "missingCompensation": 0 }, … ],
+  "totalHeadcount": 20, "totalAnnualSalary": 1580000.00
+}
+```
+
+`partTime` counts PartTime, Contract and Seasonal employees. `missingCompensation` counts people on payroll with no
+rate in force. `200` · `400` unreadable date
 
 ## Audit
 
