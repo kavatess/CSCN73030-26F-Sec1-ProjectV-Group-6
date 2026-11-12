@@ -325,6 +325,38 @@ All required; `expiryDate` must be after `issueDate`. `201` → `Credential` · 
 At least one field. `suspended: true` suspends; `false` lifts the suspension.
 `200` → `Credential` · `400` · `404` · `422`
 
+## Security flags (sync from the Security service)
+
+The Security service pushes each flag change to Staff/HR. A flag is identified by staff member and flag type
+(e.g. `UnderInvestigation`); an **Active** flag makes the person ineligible for duty.
+
+### `PUT /staff/{staffNumber}/security-flags/{flagType}`
+
+```json
+{ "status": "Active", "updatedAt": "2026-11-04T09:00:00Z" }
+```
+
+`status` (`Active` | `Cleared`) is required. `updatedAt` is when Security changed the flag; it defaults to now.
+`flagType` is 1–50 letters, digits, `.`, `-` or `_`.
+
+| Case | Response | `Sync-Result` header |
+| --- | --- | --- |
+| New flag | `201` → `SecurityFlag` | `created` |
+| Newer (or equal) `updatedAt` | `200` → `SecurityFlag` | `updated` |
+| Older `updatedAt` than stored (a late message) | `200` → the stored flag, unchanged | `ignored-stale` |
+
+Errors: `400` unknown status · `404` unknown staff · `422` invalid flag type or missing status.
+
+`SecurityFlag` = `{ flagId, staffNumber, flagType, status, updatedAt }`
+
+### `GET /staff/{staffNumber}/security-flags`
+
+`200` → `SecurityFlag[]` · `404`
+
+### `GET /security-flags?status=&flagType=`
+
+Most recently changed first, e.g. `?status=Active` to reconcile with the Security service. `200` → `SecurityFlag[]` · `400`
+
 ## Audit
 
 Every create, update and delete of a staff member, assignment, roster entry, requisition, credential,

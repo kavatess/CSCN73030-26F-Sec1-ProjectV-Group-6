@@ -9,8 +9,7 @@ using Microsoft.EntityFrameworkCore.Metadata.Builders;
 
 namespace CSCN73030_26F_Sec1_ProjectV_Group_6.Server.Data.Configurations;
 
-// Tables created now so next sprint needs no schema migration churn.
-// No endpoint in this release reads or writes them.
+// Tables that support the audit, integration-event, security-flag and payroll features.
 
 /// <summary>EF Core mapping for the Compensation table: salary history, never exposed.</summary>
 public class CompensationConfiguration : IEntityTypeConfiguration<Compensation>
@@ -46,6 +45,8 @@ public class SecurityFlagConfiguration : IEntityTypeConfiguration<SecurityFlag>
             .WithMany()
             .HasForeignKey(f => f.StaffId)
             .OnDelete(DeleteBehavior.Restrict);
+        // One row per flag type per person: the Security service's updates are upserts.
+        b.HasIndex(f => new { f.StaffId, f.FlagType }).IsUnique();
     }
 }
 

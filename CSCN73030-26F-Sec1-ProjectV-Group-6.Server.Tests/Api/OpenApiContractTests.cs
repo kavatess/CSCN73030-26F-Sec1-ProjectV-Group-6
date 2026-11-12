@@ -22,6 +22,7 @@ namespace CSCN73030_26F_Sec1_ProjectV_Group_6.Server.Tests.Api
             "POST /requisitions", "GET /requisitions", "GET /requisitions/{number}", "PATCH /requisitions/{number}",
             "GET /credentials", "GET /credentials/types", "GET /credentials/expiring", "POST /staff/{staffNumber}/credentials", "PATCH /credentials/{id}",
             "GET /audit",
+            "PUT /staff/{staffNumber}/security-flags/{flagType}", "GET /staff/{staffNumber}/security-flags", "GET /security-flags",
         };
 
         private async Task<JsonElement> DocumentAsync()

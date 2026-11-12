@@ -369,7 +369,8 @@ namespace CSCN73030_26F_Sec1_ProjectV_Group_6.Server.Data.Migrations
 
                     b.HasKey("FlagId");
 
-                    b.HasIndex("StaffId");
+                    b.HasIndex("StaffId", "FlagType")
+                        .IsUnique();
 
                     b.ToTable("SecurityFlag", (string)null);
                 });

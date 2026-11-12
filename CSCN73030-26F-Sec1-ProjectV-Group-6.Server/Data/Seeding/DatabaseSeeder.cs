@@ -70,6 +70,7 @@ public class DatabaseSeeder
         SeedCredentials(staff, types);
         SeedParamedicRoster(staff, services["Paramedic Service"]);
         await SeedRequisitionsAsync();
+        SeedSecurityFlags(staff);
         await _db.SaveChangesAsync();
 
         await transaction.CommitAsync();
@@ -234,6 +235,20 @@ public class DatabaseSeeder
     }
 
     // ---- Credentials -----------------------------------------------------------------------
+
+    /// <summary>Two flags as the Security service would send them: one in force, one already lifted.</summary>
+    private void SeedSecurityFlags(Dictionary<string, Staff> staff)
+    {
+        var now = _clock.UtcNow;
+        _db.SecurityFlags.Add(new SecurityFlag
+        {
+            Staff = staff["noor"], FlagType = "UnderInvestigation", Status = SecurityFlagStatus.Active, UpdatedAt = now.AddDays(-12),
+        });
+        _db.SecurityFlags.Add(new SecurityFlag
+        {
+            Staff = staff["anders"], FlagType = "BackgroundCheckRenewal", Status = SecurityFlagStatus.Cleared, UpdatedAt = now.AddDays(-40),
+        });
+    }
 
     private void SeedCredentials(Dictionary<string, Staff> staff, Dictionary<string, CredentialType> types)
     {

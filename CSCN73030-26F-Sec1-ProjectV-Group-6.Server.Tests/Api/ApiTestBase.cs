@@ -35,7 +35,9 @@ namespace CSCN73030_26F_Sec1_ProjectV_Group_6.Server.Tests.Api
         public const string Wren = "STF-0000007";
         /// <summary>Rowan Tibbets, Firefighter, OnLeave (EMS).</summary>
         public const string Rowan = "STF-0000008";
-        /// <summary>Noor Abernathy, Bylaw Officer, Suspended (SEC); holds the only seeded suspended credential.</summary>
+        /// <summary>Anders Kittredge, Detective Sergeant (SEC); holds a Cleared security flag.</summary>
+        public const string Anders = "STF-0000010";
+        /// <summary>Noor Abernathy, Bylaw Officer, Suspended (SEC); holds the only seeded suspended credential and an Active UnderInvestigation flag.</summary>
         public const string Noor = "STF-0000011";
         /// <summary>Matteo Rasmussen, Fleet Mechanic, Terminated (PTR).</summary>
         public const string Matteo = "STF-0000014";

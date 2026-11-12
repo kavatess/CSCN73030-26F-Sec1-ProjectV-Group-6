@@ -23,6 +23,15 @@ public enum EmploymentStatus
     Terminated
 }
 
+/// <summary>State of a security flag synced from the Security service.</summary>
+public enum SecurityFlagStatus
+{
+    /// <summary>In force: the person is not eligible for duty.</summary>
+    Active,
+    /// <summary>Lifted by the Security service.</summary>
+    Cleared
+}
+
 /// <summary>The contract an employee is on.</summary>
 public enum EmploymentType
 {

@@ -5,7 +5,10 @@
 
 namespace CSCN73030_26F_Sec1_ProjectV_Group_6.Server.Domain;
 
-/// <summary>A flag synced from the Security service. Schema only in this release.</summary>
+/// <summary>
+/// A flag synced from the Security service, e.g. UnderInvestigation. One row per flag type per
+/// person. An Active flag makes the person ineligible for duty.
+/// </summary>
 public class SecurityFlag
 {
     /// <summary>Database key.</summary>
@@ -17,12 +20,12 @@ public class SecurityFlag
     /// <summary>Flagged employee.</summary>
     public Staff Staff { get; set; } = null!;
 
-    /// <summary>Kind of flag, as defined by the Security service.</summary>
+    /// <summary>Kind of flag, as defined by the Security service (letters, digits, '.', '-' or '_'; max 50).</summary>
     public string FlagType { get; set; } = "";
 
-    /// <summary>Flag status, as defined by the Security service.</summary>
-    public string Status { get; set; } = "";
+    /// <summary>Active (blocks duty) or Cleared.</summary>
+    public SecurityFlagStatus Status { get; set; }
 
-    /// <summary>When the flag last changed, UTC.</summary>
+    /// <summary>When the Security service last changed the flag, UTC. Older updates are ignored.</summary>
     public DateTime UpdatedAt { get; set; }
 }
