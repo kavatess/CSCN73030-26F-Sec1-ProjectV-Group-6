@@ -7,8 +7,8 @@ The Staff/HR service has two automated test suites. Run both before every releas
 | Server (ASP.NET) | xUnit + `WebApplicationFactory` + Testcontainers (SQL Server) | `CSCN73030-26F-Sec1-ProjectV-Group-6.Server.Tests/` |
 | Client (React) | Vitest + Testing Library | `cscn73030-26f-sec1-projectv-group-6.client/src/*.test.jsx` |
 
-The server suite has 342 test cases: 22 for the original template sample and 320 for the Staff/HR backend
-(80 unit cases and 240 API cases).
+The server suite has 532 test cases: 22 for the original template sample and 510 for the Staff/HR backend
+(116 unit cases and 394 API cases).
 
 ## Prerequisites
 
@@ -92,16 +92,36 @@ trace each failure to a task.
 
 ### Server: Staff/HR backend
 
-Each row is one test method; **Cases** counts its data rows when it is a theory. Where each business rule is tested:
+Each row is one test method; **Cases** counts its data rows when it is a theory. IDs are permanent: a new test gets the next free ID, and a renamed or removed test retires its ID instead of passing it on, so IDs quoted in release notes stay valid.
 
-| Rule | Tests |
+Retired IDs (the test was renamed or replaced when Termination requisitions and payroll were added):
+
+| Retired ID | Old test | Replaced by |
+| --- | --- | --- |
+| API-105 | `RequisitionsApiTests.Create_Termination_Returns422` | API-158 `RequisitionsApiTests.Create_TerminationWithoutStaffNumberOrReason_Returns422` |
+| API-153 | `OpenApiContractTests.Document_NoSchemaExposesSalary` | API-161 `OpenApiContractTests.Document_SalaryOnlyInPayrollSchemas` |
+| UNT-012 | `RequisitionWorkflowTests.CanMove_AllowsTheDocumentedMoves` | UNT-035 `RequisitionWorkflowTests.CanMove_Hire_AllowsTheDocumentedMoves` |
+| UNT-014 | `RequisitionWorkflowTests.NextStatuses_IsEmptyForFinalStatuses` | UNT-038 `RequisitionWorkflowTests.FinalStatuses_HaveNoNextStatus` |
+| UNT-016 | `RequisitionWorkflowTests.NextStatuses_IsDefinedForEveryStatus` | UNT-039 `RequisitionWorkflowTests.NextStatuses_IsDefinedForEveryStatusAndType` |
+
+Where each rule and feature is tested:
+
+| Rule / feature | Tests |
 | --- | --- |
 | 1. Staff number: STF-0000000, one sequence, immutable, never reused | UNT-001–004, API-008, API-009, API-028–030, API-037 |
-| 2. Work email unique city-wide (409) | API-012, API-013, API-031, API-032 |
-| 3. Idempotency-Key on POST /requisitions | API-096–104, API-108 |
-| 4. No salary in any DTO | API-023, API-048, API-153 |
+| 2. Work email unique city-wide (409) | API-012, API-013, API-031, API-032, API-259 |
+| 3. Idempotency-Key on POST /requisitions | API-096–104, API-108, API-204 |
+| 4. No salary in staff/search DTOs; payroll role only | API-023, API-048, API-161, API-230, payroll rows of API-240 |
 | 5. Credential status derived on read; Suspended overrides | UNT-005–011, API-127–129, API-138, API-145 |
 | 6. Date ordering; no overlapping shifts | API-054, API-063, API-084–089, API-140, API-146 |
+| Duty eligibility | DutyEligibilityRulesTests (UNT-040–UNT-049), EligibilityApiTests (API-191–API-202) |
+| Termination requisitions | TerminationApiTests (API-203–API-221), workflow UNT-013–UNT-039 |
+| Security flag sync | SecurityFlagsApiTests (API-178–API-190) |
+| Audit log | AuditApiTests (API-162–API-170) |
+| Integration events (outbox, Service Bus) | IntegrationEventsApiTests (API-171–API-177), ServiceBusMessageTests (UNT-050–UNT-052) |
+| Authentication and roles | AuthorizationApiTests (API-237–API-243), JwtAuthenticationTests (API-244–API-250), AuthSetupTests (UNT-053–UNT-056) |
+| Department scope (EF query filters) | DepartmentScopeApiTests (API-251–API-259) |
+| Health, metrics, configuration | HealthApiTests (API-001–API-157), MetricsApiTests (API-260–API-262), ObservabilitySetupTests (UNT-057–UNT-059) |
 
 #### Unit tests (no database)
 
@@ -126,15 +146,17 @@ Each row is one test method; **Cases** counts its data rows when it is a theory.
 | UNT-010 | `CredentialStatusRulesTests.Worst_PicksTheMostUrgentStatus` | 1 | Worst: picks the most urgent status | |
 | UNT-011 | `CredentialStatusRulesTests.Worst_ReturnsNullWhenNoCredentialsAreHeld` | 1 | Worst: returns null when no credentials are held | |
 
-**RequisitionWorkflowTests**: Received → HRReview → AwaitingBudget → Approved → Filling → Completed → Closed, plus Rejected and Closed exits.
+**RequisitionWorkflowTests**: Hire: Received → HRReview → AwaitingBudget → Approved → Filling → Completed → Closed. Termination: Received → HRReview → Approved → Completed → Closed. Both have Rejected and Closed exits.
 
 | ID | Test | Cases | Checks | Issue |
 | --- | --- | --- | --- | --- |
-| UNT-012 | `RequisitionWorkflowTests.CanMove_AllowsTheDocumentedMoves` | 14 | CanMove: allows the documented moves | |
-| UNT-013 | `RequisitionWorkflowTests.CanMove_RejectsEveryOtherMove` | 1 | CanMove: rejects every other move | |
-| UNT-014 | `RequisitionWorkflowTests.NextStatuses_IsEmptyForFinalStatuses` | 2 | NextStatuses: is empty for final statuses | |
+| UNT-013 | `RequisitionWorkflowTests.CanMove_RejectsEveryOtherMove` | 2 | CanMove: rejects every other move | |
 | UNT-015 | `RequisitionWorkflowTests.NextStatuses_ListsTheAllowedMovesFromReceived` | 1 | NextStatuses: lists the allowed moves from received | |
-| UNT-016 | `RequisitionWorkflowTests.NextStatuses_IsDefinedForEveryStatus` | 1 | NextStatuses: is defined for every status | |
+| UNT-035 | `RequisitionWorkflowTests.CanMove_Hire_AllowsTheDocumentedMoves` | 14 | CanMove: hire → allows the documented moves | |
+| UNT-036 | `RequisitionWorkflowTests.CanMove_Termination_AllowsTheDocumentedMoves` | 9 | CanMove: termination → allows the documented moves | |
+| UNT-037 | `RequisitionWorkflowTests.Termination_SkipsTheBudgetStep` | 1 | Termination: skips the budget step | |
+| UNT-038 | `RequisitionWorkflowTests.FinalStatuses_HaveNoNextStatus` | 2 | FinalStatuses: have no next status | |
+| UNT-039 | `RequisitionWorkflowTests.NextStatuses_IsDefinedForEveryStatusAndType` | 1 | NextStatuses: is defined for every status and type | |
 
 **ValidationErrorsTests**: ValidationErrors collects every field problem, then throws one 422.
 
@@ -164,13 +186,54 @@ Each row is one test method; **Cases** counts its data rows when it is a theory.
 | UNT-033 | `DomainTests.ApiExceptions_CarryTheirStatusCodes` | 1 | ApiExceptions: carry their status codes | |
 | UNT-034 | `DomainTests.NotFoundException_NamesTheResourceAndKey` | 1 | NotFoundException: names the resource and key | |
 
+**DutyEligibilityRulesTests**: Status, current assignment, duty-blocking credentials and security flags.
+
+| ID | Test | Cases | Checks | Issue |
+| --- | --- | --- | --- | --- |
+| UNT-040 | `DutyEligibilityRulesTests.ActiveStaffWithCurrentAssignmentAndValidCredentials_IsEligible` | 1 | ActiveStaffWithCurrentAssignmentAndValidCredentials: is eligible | |
+| UNT-041 | `DutyEligibilityRulesTests.EmploymentStatus_OnlyActiveAndProbationMayWork` | 5 | EmploymentStatus: only active and probation may work | |
+| UNT-042 | `DutyEligibilityRulesTests.NoAssignmentCoveringTheDay_IsIneligible` | 1 | NoAssignmentCoveringTheDay: is ineligible | |
+| UNT-043 | `DutyEligibilityRulesTests.AssignmentInAnotherService_IsIneligibleForThatService` | 1 | AssignmentInAnotherService: is ineligible for that service | |
+| UNT-044 | `DutyEligibilityRulesTests.ExpiredDutyBlockingCredential_IsIneligible` | 1 | ExpiredDutyBlockingCredential: is ineligible | |
+| UNT-045 | `DutyEligibilityRulesTests.SuspendedDutyBlockingCredential_IsIneligible` | 1 | SuspendedDutyBlockingCredential: is ineligible | |
+| UNT-046 | `DutyEligibilityRulesTests.ExpiringDutyBlockingCredential_IsOnlyAWarning` | 1 | ExpiringDutyBlockingCredential: is only a warning | |
+| UNT-047 | `DutyEligibilityRulesTests.ExpiredCredentialThatDoesNotBlockDuty_IsIgnored` | 1 | ExpiredCredentialThatDoesNotBlockDuty: is ignored | |
+| UNT-048 | `DutyEligibilityRulesTests.ActiveSecurityFlag_IsIneligible_ClearedIsNot` | 1 | ActiveSecurityFlag: is ineligible → cleared is not | |
+| UNT-049 | `DutyEligibilityRulesTests.EveryProblemIsReported` | 1 | Every problem is reported | |
+
+**ServiceBusMessageTests**: Message id, subject, body and properties of a published event.
+
+| ID | Test | Cases | Checks | Issue |
+| --- | --- | --- | --- | --- |
+| UNT-050 | `ServiceBusMessageTests.ToMessage_UsesTheEventIdForDuplicateDetection` | 1 | ToMessage: uses the event id for duplicate detection | |
+| UNT-051 | `ServiceBusMessageTests.ToMessage_CarriesTypeVersionAndPayload` | 1 | ToMessage: carries type version and payload | |
+| UNT-052 | `ServiceBusMessageTests.MessagingOptions_AreConfiguredByConnectionStringOrNamespace` | 1 | MessagingOptions: are configured by connection string or namespace | |
+
+**AuthSetupTests**: Development mode must never be usable outside the Development environment.
+
+| ID | Test | Cases | Checks | Issue |
+| --- | --- | --- | --- | --- |
+| UNT-053 | `AuthSetupTests.DevelopmentMode_OutsideDevelopment_RefusesToStart` | 2 | DevelopmentMode: outside development → refuses to start | |
+| UNT-054 | `AuthSetupTests.DevelopmentMode_InDevelopment_IsAllowed` | 1 | DevelopmentMode: in development → is allowed | |
+| UNT-055 | `AuthSetupTests.EntraIdMode_IsAllowedEverywhere` | 1 | EntraIdMode: is allowed everywhere | |
+| UNT-056 | `AuthSetupTests.DefaultMode_IsEntraId` | 1 | DefaultMode: is entra id | |
+
+**ObservabilitySetupTests**: Local runs need no Azure resources.
+
+| ID | Test | Cases | Checks | Issue |
+| --- | --- | --- | --- | --- |
+| UNT-057 | `ObservabilitySetupTests.KeyVault_IsSkippedWithoutAUri` | 1 | KeyVault: is skipped without a uri | |
+| UNT-058 | `ObservabilitySetupTests.Telemetry_IsLocalOnlyWithoutAConnectionString` | 1 | Telemetry: is local only without a connection string | |
+| UNT-059 | `ObservabilitySetupTests.Telemetry_ExportsToAzureMonitorWhenConfigured` | 1 | Telemetry: exports to azure monitor when configured | |
+
 #### API tests (real app + SQL Server)
 
-**HealthApiTests**: GET /health reports the service and its database.
+**HealthApiTests**: GET /health reports the service, its database and the integration-event backlog.
 
 | ID | Test | Cases | Checks | Issue |
 | --- | --- | --- | --- | --- |
 | API-001 | `HealthApiTests.Health_WithDatabaseUp_Returns200Healthy` | 1 | Health: with database up → returns 200 healthy | |
+| API-157 | `HealthApiTests.Health_WithEventsStuckInTheOutbox_IsDegradedButStill200` | 1 | Health: with events stuck in the outbox → is degraded but still 200 | |
 
 **DepartmentsApiTests**: Departments, their services and per-department headcount.
 
@@ -304,7 +367,6 @@ Each row is one test method; **Cases** counts its data rows when it is a theory.
 | API-102 | `RequisitionsApiTests.Create_SeededKeyIsAlsoProtected` | 1 | Create: seeded key is also protected | |
 | API-103 | `RequisitionsApiTests.Create_MissingOrBlankIdempotencyKey_Returns400` | 3 | Create: missing or blank idempotency key → returns 400 | |
 | API-104 | `RequisitionsApiTests.Create_IdempotencyKeyOver100Characters_Returns400` | 1 | Create: idempotency key over 100 characters → returns 400 | |
-| API-105 | `RequisitionsApiTests.Create_Termination_Returns422` | 1 | Create: termination → returns 422 | |
 | API-106 | `RequisitionsApiTests.Create_PositionsOutOfRange_Returns422` | 2 | Create: positions out of range → returns 422 | |
 | API-107 | `RequisitionsApiTests.Create_MissingFieldsOrUnknownDepartment_Returns422` | 1 | Create: missing fields or unknown department → returns 422 | |
 | API-108 | `RequisitionsApiTests.Create_InvalidRequest_DoesNotUseUpTheKey` | 1 | Create: invalid request → does not use up the key | |
@@ -326,6 +388,7 @@ Each row is one test method; **Cases** counts its data rows when it is a theory.
 | API-124 | `RequisitionsApiTests.Patch_UnknownNumber_Returns404` | 1 | Patch: unknown number → returns 404 | |
 | API-125 | `RequisitionsApiTests.Patch_UnknownStatusValue_Returns400` | 1 | Patch: unknown status value → returns 400 | |
 | API-126 | `RequisitionsApiTests.Vacancies_CountApprovedAndFillingRequisitionsOnly` | 1 | Vacancies: count approved and filling requisitions only | |
+| API-158 | `RequisitionsApiTests.Create_TerminationWithoutStaffNumberOrReason_Returns422` | 1 | Create: termination without staff number or reason → returns 422 | |
 
 **CredentialsApiTests**: Credentials. Status is derived from the expiry date on every read (test day: 5 Nov 2026). Assertions on seeded counts filter by EMS or SEC; write tests use new HRS staff.
 
@@ -353,19 +416,172 @@ Each row is one test method; **Cases** counts its data rows when it is a theory.
 | API-146 | `CredentialsApiTests.Patch_ExpiryBeforeIssue_Returns422` | 1 | Patch: expiry before issue → returns 422 | |
 | API-147 | `CredentialsApiTests.Patch_EmptyBodyOrBlankNumber_Returns422` | 1 | Patch: empty body or blank number → returns 422 | |
 | API-148 | `CredentialsApiTests.Patch_UnknownCredential_Returns404` | 1 | Patch: unknown credential → returns 404 | |
+| API-159 | `CredentialsApiTests.Types_ListsTheTwelveSeededTypesByName` | 1 | Types: lists the twelve seeded types by name | |
+| API-160 | `CredentialsApiTests.Types_IdsWorkForCreatingACredential` | 1 | Types: ids work for creating a credential | |
 
 **OpenApiContractTests**: The OpenAPI document other groups review, and the Swagger UI over it.
 
 | ID | Test | Cases | Checks | Issue |
 | --- | --- | --- | --- | --- |
-| API-149 | `OpenApiContractTests.Document_ListsEveryEndpoint` | 24 | Document: lists every endpoint | |
-| API-150 | `OpenApiContractTests.Document_ErrorResponsesAreProblemJsonWithAnExample` | 24 | Document: error responses are problem JSON with an example | |
+| API-149 | `OpenApiContractTests.Document_ListsEveryEndpoint` | 33 | Document: lists every endpoint | |
+| API-150 | `OpenApiContractTests.Document_ErrorResponsesAreProblemJsonWithAnExample` | 33 | Document: error responses are problem JSON with an example | |
 | API-151 | `OpenApiContractTests.Document_DescribesTheKeyErrorCases` | 8 | Document: describes the key error cases | |
 | API-152 | `OpenApiContractTests.Document_IdempotencyKeyHeaderIsRequired` | 1 | Document: idempotency key header is required | |
-| API-153 | `OpenApiContractTests.Document_NoSchemaExposesSalary` | 1 | Document: no schema exposes salary | |
 | API-154 | `OpenApiContractTests.Document_RequestSchemasListOnlyTrulyRequiredFields` | 1 | Document: request schemas list only truly required fields | |
 | API-155 | `OpenApiContractTests.Document_EnumsAreStrings` | 1 | Document: enums are strings | |
 | API-156 | `OpenApiContractTests.SwaggerUi_IsServedInDevelopment` | 1 | SwaggerUi: is served in development | |
+| API-161 | `OpenApiContractTests.Document_SalaryOnlyInPayrollSchemas` | 1 | Document: salary only in payroll schemas | |
+
+**AuditApiTests**: Every create, update and delete leaves an AuditLog row; failed requests leave none.
+
+| ID | Test | Cases | Checks | Issue |
+| --- | --- | --- | --- | --- |
+| API-162 | `AuditApiTests.CreatingStaff_IsAuditedWithTheStaffNumber` | 1 | CreatingStaff: is audited with the staff number | |
+| API-163 | `AuditApiTests.UpdatingStaff_AddsAnUpdatedRow_NewestFirst` | 1 | UpdatingStaff: adds an updated row → newest first | |
+| API-164 | `AuditApiTests.InitialAssignment_IsAuditedWithItsNewId` | 1 | InitialAssignment: is audited with its new id | |
+| API-165 | `AuditApiTests.DeletingAShift_IsAudited` | 1 | DeletingAShift: is audited | |
+| API-166 | `AuditApiTests.Requisitions_AreAuditedByNumber` | 1 | Requisitions: are audited by number | |
+| API-167 | `AuditApiTests.RejectedRequest_WritesNoAuditRow` | 1 | RejectedRequest: writes no audit row | |
+| API-168 | `AuditApiTests.SeededRecords_AreAuditedAsCreatedBySystem` | 1 | SeededRecords: are audited as created by system | |
+| API-169 | `AuditApiTests.Search_IsPaged` | 1 | Search: is paged | |
+| API-170 | `AuditApiTests.Search_InvalidPaging_Returns422` | 2 | Search: invalid paging → returns 422 | |
+
+**IntegrationEventsApiTests**: Onboarding writes a Staff.Onboarded event in the same transaction; the dispatcher publishes it once, in order.
+
+| ID | Test | Cases | Checks | Issue |
+| --- | --- | --- | --- | --- |
+| API-171 | `IntegrationEventsApiTests.Onboarding_WritesOneUnpublishedStaffOnboardedEvent` | 1 | Onboarding: writes one unpublished staff onboarded event | |
+| API-172 | `IntegrationEventsApiTests.OnboardedPayload_LeavesOutPersonalAndPayData` | 1 | OnboardedPayload: leaves out personal and pay data | |
+| API-173 | `IntegrationEventsApiTests.FailedOnboarding_WritesNoEvent` | 1 | FailedOnboarding: writes no event | |
+| API-174 | `IntegrationEventsApiTests.Dispatcher_PublishesPendingEventsAndMarksThem` | 1 | Dispatcher: publishes pending events and marks them | |
+| API-175 | `IntegrationEventsApiTests.Dispatcher_DoesNotPublishTheSameEventTwice` | 1 | Dispatcher: does not publish the same event twice | |
+| API-176 | `IntegrationEventsApiTests.Dispatcher_WhenBrokerIsDown_KeepsEventsAndRetriesLater` | 1 | Dispatcher: when broker is down → keeps events and retries later | |
+| API-177 | `IntegrationEventsApiTests.Dispatcher_PublishesInTheOrderEventsHappened` | 1 | Dispatcher: publishes in the order events happened | |
+
+**SecurityFlagsApiTests**: PUT upserts a flag per staff member and type; stale updates are ignored.
+
+| ID | Test | Cases | Checks | Issue |
+| --- | --- | --- | --- | --- |
+| API-178 | `SecurityFlagsApiTests.Put_NewFlag_Returns201` | 1 | Put: new flag → returns 201 | |
+| API-179 | `SecurityFlagsApiTests.Put_ExistingFlag_UpdatesInPlace` | 1 | Put: existing flag → updates in place | |
+| API-180 | `SecurityFlagsApiTests.Put_OlderUpdate_IsIgnored` | 1 | Put: older update → is ignored | |
+| API-181 | `SecurityFlagsApiTests.Put_SameUpdateTwice_IsHarmless` | 1 | Put: same update twice → is harmless | |
+| API-182 | `SecurityFlagsApiTests.Put_IsAudited` | 1 | Put: is audited | |
+| API-183 | `SecurityFlagsApiTests.Put_InvalidFlagType_Returns422` | 2 | Put: invalid flag type → returns 422 | |
+| API-184 | `SecurityFlagsApiTests.Put_FlagTypeOver50Characters_Returns422` | 1 | Put: flag type over 50 characters → returns 422 | |
+| API-185 | `SecurityFlagsApiTests.Put_MissingStatus_Returns422` | 1 | Put: missing status → returns 422 | |
+| API-186 | `SecurityFlagsApiTests.Put_UnknownStatus_Returns400` | 1 | Put: unknown status → returns 400 | |
+| API-187 | `SecurityFlagsApiTests.Put_UnknownStaff_Returns404` | 1 | Put: unknown staff → returns 404 | |
+| API-188 | `SecurityFlagsApiTests.List_ReturnsSeededFlags` | 1 | List: returns seeded flags | |
+| API-189 | `SecurityFlagsApiTests.List_UnknownStaff_Returns404` | 1 | List: unknown staff → returns 404 | |
+| API-190 | `SecurityFlagsApiTests.Search_FiltersByStatusAndType` | 1 | Search: filters by status and type | |
+
+**EligibilityApiTests**: Eligibility of seeded people on the test day (5 Nov 2026), whose situations cover every rule.
+
+| ID | Test | Cases | Checks | Issue |
+| --- | --- | --- | --- | --- |
+| API-191 | `EligibilityApiTests.ValidParamedic_IsEligibleWithoutWarnings` | 1 | ValidParamedic: is eligible without warnings | |
+| API-192 | `EligibilityApiTests.ExpiringCpr_IsEligibleWithAWarning` | 1 | ExpiringCpr: is eligible with a warning | |
+| API-193 | `EligibilityApiTests.SingleProblem_IsIneligibleForThatReason` | 3 | SingleProblem: is ineligible for that reason | |
+| API-194 | `EligibilityApiTests.SuspendedFlaggedOfficer_ListsEveryReason` | 1 | SuspendedFlaggedOfficer: lists every reason | |
+| API-195 | `EligibilityApiTests.TerminatedEmployee_HasNoCurrentAssignment` | 1 | TerminatedEmployee: has no current assignment | |
+| API-196 | `EligibilityApiTests.ForAService_RequiresAnAssignmentInThatService` | 1 | ForAService: requires an assignment in that service | |
+| API-197 | `EligibilityApiTests.AtAFutureDate_UsesThatDatesCredentialStatus` | 1 | AtAFutureDate: uses that dates credential status | |
+| API-198 | `EligibilityApiTests.ActiveFlag_BlocksDuty_UntilCleared` | 1 | ActiveFlag: blocks duty → until cleared | |
+| API-199 | `EligibilityApiTests.NewHireWithoutAssignment_IsIneligible` | 1 | NewHireWithoutAssignment: is ineligible | |
+| API-200 | `EligibilityApiTests.UnknownStaff_Returns404` | 1 | UnknownStaff: returns 404 | |
+| API-201 | `EligibilityApiTests.UnknownService_Returns422` | 1 | UnknownService: returns 422 | |
+| API-202 | `EligibilityApiTests.UnreadableInstant_Returns400` | 1 | UnreadableInstant: returns 400 | |
+
+**TerminationApiTests**: Termination requisitions: Received → HRReview → Approved → Completed. Completing one terminates the employee, ends their assignments, cancels unfinished shifts and publishes Staff.Terminated.
+
+| ID | Test | Cases | Checks | Issue |
+| --- | --- | --- | --- | --- |
+| API-203 | `TerminationApiTests.Create_ReturnsATerminationForTheEmployee` | 1 | Create: returns a termination for the employee | |
+| API-204 | `TerminationApiTests.Create_ReplayWithSameKey_ReturnsTheOriginal_DifferentEmployee_Is409` | 1 | Create: replay with same key → returns the original → different employee → is 409 | |
+| API-205 | `TerminationApiTests.Create_SecondOpenTerminationForTheSamePerson_Returns409` | 1 | Create: second open termination for the same person → returns 409 | |
+| API-206 | `TerminationApiTests.Create_AfterARejectedTermination_IsAllowed` | 1 | Create: after a rejected termination → is allowed | |
+| API-207 | `TerminationApiTests.Create_ForAnAlreadyTerminatedEmployee_Returns422` | 1 | Create: for an already terminated employee → returns 422 | |
+| API-208 | `TerminationApiTests.Create_InvalidTermination_Returns422PerField` | 1 | Create: invalid termination → returns 422 per field | |
+| API-209 | `TerminationApiTests.Create_HireNamingAnEmployee_Returns422` | 1 | Create: hire naming an employee → returns 422 | |
+| API-210 | `TerminationApiTests.Workflow_SkippingHRReview_Returns422` | 1 | Workflow: skipping hr review → returns 422 | |
+| API-211 | `TerminationApiTests.Workflow_HasNoBudgetStepOrPositionsToFill` | 1 | Workflow: has no budget step or positions to fill | |
+| API-212 | `TerminationApiTests.Workflow_ApprovedIsNotYetATermination` | 1 | Workflow: approved is not yet a termination | |
+| API-213 | `TerminationApiTests.Workflow_RejectedLeavesTheEmployeeUntouched` | 1 | Workflow: rejected leaves the employee untouched | |
+| API-214 | `TerminationApiTests.Complete_TerminatesTheEmployeeAndKeepsTheStaffNumber` | 1 | Complete: terminates the employee and keeps the staff number | |
+| API-215 | `TerminationApiTests.Complete_EndsCurrentAssignmentsTodayAndRemovesFutureOnes` | 1 | Complete: ends current assignments today and removes future ones | |
+| API-216 | `TerminationApiTests.Complete_CancelsUnfinishedShiftsOnly` | 1 | Complete: cancels unfinished shifts only | |
+| API-217 | `TerminationApiTests.Complete_RemovesDutyEligibility` | 1 | Complete: removes duty eligibility | |
+| API-218 | `TerminationApiTests.Complete_PublishesStaffTerminated` | 1 | Complete: publishes staff terminated | |
+| API-219 | `TerminationApiTests.Complete_IsAudited` | 1 | Complete: is audited | |
+| API-220 | `TerminationApiTests.Complete_ThenClosed_IsAllowed_ButNotReopened` | 1 | Complete: then closed → is allowed → but not reopened | |
+| API-221 | `TerminationApiTests.Terminations_AreNotVacancies_AndFilterByType` | 1 | Terminations: are not vacancies → and filter by type | |
+
+**PayrollApiTests**: Pay history (non-overlapping rates) and per-department payroll totals.
+
+| ID | Test | Cases | Checks | Issue |
+| --- | --- | --- | --- | --- |
+| API-222 | `PayrollApiTests.SetPay_FirstRate_IsCurrent` | 1 | SetPay: first rate → is current | |
+| API-223 | `PayrollApiTests.SetPay_NewRate_ClosesThePreviousOneOnItsStart` | 1 | SetPay: new rate → closes the previous one on its start | |
+| API-224 | `PayrollApiTests.SetPay_SameStartDate_CorrectsTheCurrentRate` | 1 | SetPay: same start date → corrects the current rate | |
+| API-225 | `PayrollApiTests.SetPay_StartingBeforeTheCurrentRate_Returns422` | 1 | SetPay: starting before the current rate → returns 422 | |
+| API-226 | `PayrollApiTests.SetPay_SalaryOutOfRange_Returns422` | 3 | SetPay: salary out of range → returns 422 | |
+| API-227 | `PayrollApiTests.SetPay_MissingFieldsOrBeforeHire_Returns422` | 1 | SetPay: missing fields or before hire → returns 422 | |
+| API-228 | `PayrollApiTests.SetPay_ForTerminatedEmployee_Returns422` | 1 | SetPay: for terminated employee → returns 422 | |
+| API-229 | `PayrollApiTests.SetPay_UnknownStaff_Returns404` | 1 | SetPay: unknown staff → returns 404 | |
+| API-230 | `PayrollApiTests.SetPay_IsAudited_ButNeverShownOnTheProfile` | 1 | SetPay: is audited → but never shown on the profile | |
+| API-231 | `PayrollApiTests.History_ShowsSeededPromotion` | 1 | History: shows seeded promotion | |
+| API-232 | `PayrollApiTests.History_UnknownStaff_Returns404` | 1 | History: unknown staff → returns 404 | |
+| API-233 | `PayrollApiTests.Headcount_TotalsEachDepartmentFromSeedData` | 1 | Headcount: totals each department from seed data | |
+| API-234 | `PayrollApiTests.Headcount_AsOfAnEarlierDate_UsesTheRatesInForceThen` | 1 | Headcount: as of an earlier date → uses the rates in force then | |
+| API-235 | `PayrollApiTests.Headcount_CountsEmployeesWithoutARate` | 1 | Headcount: counts employees without a rate | |
+| API-236 | `PayrollApiTests.Headcount_UnreadableDate_Returns400` | 1 | Headcount: unreadable date → returns 400 | |
+
+**AuthorizationApiTests**: Each policy lets the right roles through and answers 401 / 403 as ProblemDetails otherwise.
+
+| ID | Test | Cases | Checks | Issue |
+| --- | --- | --- | --- | --- |
+| API-237 | `AuthorizationApiTests.NotSignedIn_Returns401Problem` | 5 | NotSignedIn: returns 401 problem | |
+| API-238 | `AuthorizationApiTests.Health_IsOpenToEveryone` | 1 | Health: is open to everyone | |
+| API-239 | `AuthorizationApiTests.SignedInWithoutAnyRole_Returns403` | 1 | SignedInWithoutAnyRole: returns 403 | |
+| API-240 | `AuthorizationApiTests.Roles_AreEnforced` | 23 | Roles: are enforced | |
+| API-241 | `AuthorizationApiTests.RosterScheduler_CanAddAShift` | 1 | RosterScheduler: can add a shift | |
+| API-242 | `AuthorizationApiTests.Audit_RecordsTheSignedInUser` | 1 | Audit: records the signed in user | |
+| API-243 | `AuthorizationApiTests.OpenApi_DocumentsBearerAuthAnd401403` | 1 | OpenApi: documents bearer auth and 401403 | |
+
+**JwtAuthenticationTests**: Runs the app in EntraId mode. Instead of downloading Entra ID's signing keys, the test trusts one local key and issuer, so it can mint valid, expired and wrongly addressed tokens.
+
+| ID | Test | Cases | Checks | Issue |
+| --- | --- | --- | --- | --- |
+| API-244 | `JwtAuthenticationTests.ValidTokenWithRole_IsAccepted` | 1 | ValidTokenWithRole: is accepted | |
+| API-245 | `JwtAuthenticationTests.NoToken_Returns401WithBearerChallenge` | 1 | NoToken: returns 401 with bearer challenge | |
+| API-246 | `JwtAuthenticationTests.ExpiredToken_Returns401` | 1 | ExpiredToken: returns 401 | |
+| API-247 | `JwtAuthenticationTests.TokenForAnotherApi_Returns401` | 1 | TokenForAnotherApi: returns 401 | |
+| API-248 | `JwtAuthenticationTests.TokenSignedWithAnotherKey_Returns401` | 1 | TokenSignedWithAnotherKey: returns 401 | |
+| API-249 | `JwtAuthenticationTests.ValidTokenWithoutTheRole_Returns403` | 1 | ValidTokenWithoutTheRole: returns 403 | |
+| API-250 | `JwtAuthenticationTests.DevelopmentHeaders_AreIgnoredInEntraIdMode` | 1 | DevelopmentHeaders: are ignored in entra id mode | |
+
+**DepartmentScopeApiTests**: A caller with a department claim sees only its own department's people and records.
+
+| ID | Test | Cases | Checks | Issue |
+| --- | --- | --- | --- | --- |
+| API-251 | `DepartmentScopeApiTests.Search_ShowsOnlyTheCallersDepartment` | 1 | Search: shows only the callers department | |
+| API-252 | `DepartmentScopeApiTests.OtherDepartmentsStaff_AreNotFound` | 1 | OtherDepartmentsStaff: are not found | |
+| API-253 | `DepartmentScopeApiTests.Credentials_AreFilteredToo` | 1 | Credentials: are filtered too | |
+| API-254 | `DepartmentScopeApiTests.Requisitions_ShowOnlyThoseRaisedByTheDepartment` | 1 | Requisitions: show only those raised by the department | |
+| API-255 | `DepartmentScopeApiTests.Headcount_CountsOnlyTheCallersDepartment` | 1 | Headcount: counts only the callers department | |
+| API-256 | `DepartmentScopeApiTests.RosterWriter_CannotRosterAnotherDepartmentsStaff` | 1 | RosterWriter: cannot roster another departments staff | |
+| API-257 | `DepartmentScopeApiTests.Submitter_CanOnlyRaiseRequisitionsForItsDepartment` | 1 | Submitter: can only raise requisitions for its department | |
+| API-258 | `DepartmentScopeApiTests.Admin_IsNeverScoped` | 1 | Admin: is never scoped | |
+| API-259 | `DepartmentScopeApiTests.EmailUniqueness_StaysCityWide` | 1 | EmailUniqueness: stays city wide | |
+
+**MetricsApiTests**: Onboarding and event publishing increment their counters, tagged by department / event type.
+
+| ID | Test | Cases | Checks | Issue |
+| --- | --- | --- | --- | --- |
+| API-260 | `MetricsApiTests.Onboarding_CountsStaffOnboardedForTheDepartment` | 1 | Onboarding: counts staff onboarded for the department | |
+| API-261 | `MetricsApiTests.Publishing_CountsEventsPublished` | 1 | Publishing: counts events published | |
+| API-262 | `MetricsApiTests.FailedPublish_CountsAFailure` | 1 | FailedPublish: counts a failure | |
 
 ### Client
 

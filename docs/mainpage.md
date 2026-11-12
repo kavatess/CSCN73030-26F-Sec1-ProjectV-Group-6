@@ -60,11 +60,14 @@ with a relative URL, so the same code works behind the Vite proxy and when serve
 
 ## Current state
 
-The Staff/HR backend implements staff, departments and services, assignments, duty rosters,
-hire requisitions and credentials on SQL Server through EF Core: see @ref backend "Backend features and structure".
-`README.md` explains how to migrate, seed and run it, and `API.md` is the endpoint contract for other groups.
-The template's weather-forecast sample is still present because its original regression tests cover it.
-Every backend feature has regression tests: see @ref REGRESSION_TESTING.md "Regression testing".
+The Staff/HR backend is feature-complete for the brief: staff, departments and services, assignments, duty
+rosters, hire and termination requisitions, credentials, duty eligibility, security-flag sync, payroll for Budget,
+an audit log, `Staff.Onboarded` / `Staff.Terminated` events through a transactional outbox, Entra ID authentication
+with app roles and department-scoped data, telemetry, and Azure deployment. See
+@ref backend "Backend features and structure" and @ref deployment "Deploying to Azure". `README.md` explains how to
+run it locally and `API.md` is the contract for other groups. Every feature has regression tests:
+see @ref REGRESSION_TESTING.md "Regression testing". The template's weather-forecast sample is still present
+because its original tests cover it.
 
 ## Requirements
 

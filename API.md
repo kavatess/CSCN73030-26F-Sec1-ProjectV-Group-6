@@ -1,6 +1,6 @@
 # CMES Staff/HR API (v1)
 
-Contract for review by the other CMES groups. The live, always-current version is the OpenAPI document at
+Contract for review by the other CMES groups: 33 endpoints plus the Service Bus events at the end. The live, always-current version is the OpenAPI document at
 `/openapi/v1.json`, browsable at `/swagger` when the service runs in Development.
 
 ## Conventions
