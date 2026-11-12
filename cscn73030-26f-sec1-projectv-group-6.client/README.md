@@ -1,16 +1,33 @@
-# React + Vite
+# CMES Staff & HR frontend
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+React/Vite implementation of the seven screens in the Staff & HR design:
+workforce overview, staff directory, duty roster, requisitions, credentials,
+employee profile, and onboarding.
 
-Currently, two official plugins are available:
+## Run
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
+```bash
+npm ci
+npm run dev
+```
 
-## React Compiler
+Open the URL printed by Vite. On Windows, Visual Studio can still launch the
+client and ASP.NET server together. Run `npm test` for the frontend interaction
+tests, `npm run lint` for static checks, or `npm run build` for a production build.
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+## Current scope
 
-## Expanding the ESLint configuration
+This is a frontend prototype with a March 2026 sample dataset in
+`src/demoData.js`. Navigation, filters, search, roster assignments, CSV
+exports, and the onboarding form operate in the browser session. The UI does
+not write to the ASP.NET server, publish Azure Service Bus events, or process
+real HR records. Connect the proposed Staff, Roster, Requisition, and
+Credential endpoints before using it with live data.
 
-If you are developing a production application, we recommend using TypeScript with type-aware lint rules enabled. Check out the [TS template](https://github.com/vitejs/vite/tree/main/packages/create-vite/template-react-ts) for information on how to integrate TypeScript and [`typescript-eslint`](https://typescript-eslint.io) in your project.
+The employee form deliberately starts with an example duplicate work email
+to demonstrate the design's 409 validation state. Change it to another
+example address to try the local create flow.
+
+The `vite.config.js` keeps the Visual Studio HTTPS development proxy on
+Windows while allowing Linux/macOS standalone builds without a .NET
+development certificate.
