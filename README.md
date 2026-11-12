@@ -93,6 +93,25 @@ In Visual Studio, pressing F5 on the solution does the same.
 
 If your machine has no trusted HTTPS dev certificate, use `--launch-profile http` and `http://localhost:5058/swagger`.
 
+## Tests and documentation
+
+Regression tests (342 cases) live in `CSCN73030-26F-Sec1-ProjectV-Group-6.Server.Tests`. The backend API tests need
+Docker running, or a SQL Server named in the `STAFFHR_TEST_SQL` environment variable (for example LocalDB). Details,
+and a table of every test case, are in [docs/REGRESSION_TESTING.md](docs/REGRESSION_TESTING.md).
+
+```bash
+dotnet test CSCN73030-26F-Sec1-ProjectV-Group-6.Server.Tests
+```
+
+Code documentation is generated with Doxygen (install Doxygen and Graphviz first). The backend overview page is
+[docs/BACKEND.md](docs/BACKEND.md).
+
+```bash
+doxygen Doxyfile
+```
+
+Then open `docs/doxygen/html/index.html`.
+
 ## Seed data
 
 Every person in the seed data is **fictional**: invented names, `@cmes.example` emails (a reserved domain),
