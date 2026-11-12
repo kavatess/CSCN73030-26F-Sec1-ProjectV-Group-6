@@ -1,70 +1,213 @@
-﻿import { useEffect, useState } from 'react';
+import { useEffect, useState } from 'react';
+import { departments, initialStaff, initialRequisitions, initialCredentials, rosterStaff } from './demoData';
 import './App.css';
 
-/**
- * @file App.jsx
- * @brief Root React component of the Staff/HR client.
- */
-
-/**
- * @brief Page that shows the forecasts served by the API in a table.
- *
- * On mount it requests `weatherforecast` from the server. While no data has arrived, or the
- * server answered with an error, it shows a loading message instead of the table.
- * Sample template code; it will be replaced by the Staff/HR screens.
- *
- * @returns {JSX.Element} The page heading and either the loading message or the forecast table.
- */
-function App() {
-    const [forecasts, setForecasts] = useState();
-
-    useEffect(() => {
-        populateWeatherData();
-    }, []);
-
-    const contents = forecasts === undefined
-        ? <p><em>Loading... Please refresh once the ASP.NET backend has started. See <a href="https://aka.ms/jspsintegrationreact">https://aka.ms/jspsintegrationreact</a> for more details.</em></p>
-        : <table className="table table-striped" aria-labelledby="tableLabel">
-            <thead>
-                <tr>
-                    <th>Date</th>
-                    <th>Temp. (C)</th>
-                    <th>Temp. (F)</th>
-                    <th>Summary</th>
-                </tr>
-            </thead>
-            <tbody>
-                {forecasts.map(forecast =>
-                    <tr key={forecast.date}>
-                        <td>{forecast.date}</td>
-                        <td>{forecast.temperatureC}</td>
-                        <td>{forecast.temperatureF}</td>
-                        <td>{forecast.summary}</td>
-                    </tr>
-                )}
-            </tbody>
-        </table>;
-
-    return (
-        <div>
-            <h1 id="tableLabel">Weather forecast</h1>
-            <p>This component demonstrates fetching data from the server.</p>
-            {contents}
-        </div>
-    );
-    
-    /**
-     * @brief Fetches the forecasts from the API and stores them in state.
-     *
-     * Does nothing when the response is not OK. Network failures are not caught.
-     */
-    async function populateWeatherData() {
-        const response = await fetch('weatherforecast');
-        if (response.ok) {
-            const data = await response.json();
-            setForecasts(data);
-        }
-    }
+const menu = [['overview','Overview'],['directory','Staff directory'],['roster','Duty roster'],['requisitions','Requisitions','18'],['credentials','Credentials','23']];
+const labels = { overview:'Workforce overview', directory:'Staff directory', roster:'Duty roster', requisitions:'Requisitions', credentials:'Credentials & licence expiry', profile:'Employee profile', onboard:'Onboard employee' };
+const routes = { overview:'CITY MANAGEMENT ENTERPRISE SYSTEM', directory:'GET /STAFF?DEPARTMENT=&SERVICE=&ROLE=&STATUS=&PAGE=', roster:'GET /ROSTERS?SERVICE=PARAMEDIC&FROM=2026-03-09&TO=2026-03-15', requisitions:'POST /REQUISITIONS · GET /REQUISITIONS?STATUS=', credentials:'GET /CREDENTIALS?STATE=&EXPIRESBEFORE=', profile:'← STAFF DIRECTORY / GET /STAFF/STF-0002741', onboard:'← STAFF DIRECTORY / POST /STAFF' };
+const tone = (s) => /expired|suspended|flagged|critical|rejected|short|not eligible/i.test(s) ? 'bad' : /pending|await|expir|probation|leave|draft|review|stalled/i.test(s) ? 'warn' : /valid|active|approved|completed|published|clear|eligible|hire|yes/i.test(s) ? 'ok' : 'info';
+const Pill = ({ children, kind }) => <span className={'pill ' + (kind || tone(String(children)))}>{children}</span>;
+const Button = ({ children, onClick, variant='', small=false, disabled=false, type='button' }) => <button type={type} disabled={disabled} className={'btn ' + variant + (small?' sm':'')} onClick={onClick}>{children}</button>;
+const Stat = ({ label, value, note }) => <div className="stat"><span className="eyebrow">{label}</span><span className="stat-value">{value}</span><span className="stat-note">{note}</span></div>;
+const Panel = ({ title, action, footer, children }) => <section className="card"><div className="card-head"><h2>{title}</h2>{action}</div>{children}{footer && <div className="card-foot">{footer}</div>}</section>;
+const Select = ({ label, value, onChange, options }) => <select className="sel" aria-label={label} value={value} onChange={(e)=>onChange(e.target.value)}>{options.map(x=><option key={x}>{x}</option>)}</select>;
+const Field = ({ label, children, hint, error }) => <label className="field"><span>{label}</span>{hint && <small>{hint}</small>}{children}{error && <span className="error">{error}</span>}</label>;
+const Header = ({ page, title, actions }) => <header className="topbar"><div className="topbar-title"><span className="eyebrow">{routes[page]}</span><h1>{title||labels[page]}</h1></div><div className="topbar-actions">{actions}</div></header>;
+const Avatar = ({ name }) => <span className="person-avatar">{(name.includes(', ') ? name.split(', ').reverse() : name.split(' ')).slice(0,2).map(x=>x[0]).join('').toUpperCase()}</span>;
+function csvDownload(name, headings, rows) {
+  const quote = (v) => '"' + String(v??'').replaceAll('"','""') + '"';
+  const text = [headings,...rows].map(row=>row.map(quote).join(',')).join('\r\n');
+  const url = URL.createObjectURL(new Blob([text],{type:'text/csv;charset=utf-8'}));
+  const a = document.createElement('a'); a.href=url; a.download=name; a.click();
+  setTimeout(()=>URL.revokeObjectURL(url),1000);
+}
+function Dialog({ title, children, close, submit, action='Save' }) {
+  useEffect(()=>{ const onKey=(e)=>{if(e.key==='Escape')close();}; document.addEventListener('keydown',onKey); return ()=>document.removeEventListener('keydown',onKey); },[close]);
+  return <div className="modal-backdrop" onMouseDown={(e)=>{if(e.target===e.currentTarget)close();}}><form className="modal" onSubmit={submit} aria-label={title}><div className="card-head"><h2>{title}</h2><Button onClick={close} small>✕</Button></div><div className="card-body stack">{children}</div><div className="card-foot"><Button onClick={close}>Cancel</Button><Button type="submit" variant="primary">{action}</Button></div></form></div>;
 }
 
-export default App;
+function Overview({ go, notify }) {
+  const [search,setSearch]=useState('');
+  return <>
+    <header className="topbar"><div className="topbar-title"><span className="eyebrow">{routes.overview}</span><h1>Workforce overview</h1></div><form className="overview-search" onSubmit={(e)=>{e.preventDefault();if(search.trim())go('directory',{search});}}><input className="inp" aria-label="Search staff" placeholder="Search name or staff ID..." value={search} onChange={(e)=>setSearch(e.target.value)}/><div className="topbar-actions"><Button onClick={()=>go('requisitions')}>Requisitions</Button><Button variant="primary" onClick={()=>go('onboard')}>Onboard employee</Button></div></form></header>
+    <div className="content">
+      <div className="grid stats"><Stat label="Active staff" value="1,284" note="+12 onboarded this month"/><Stat label="On duty now" value="312" note="Across 6 departments"/><Stat label="Open requisitions" value="18" note={<Pill kind="warn">6 awaiting Budget</Pill>}/><Stat label="Credentials expiring ≤ 30d" value="23" note={<Pill kind="bad">9 block duty eligibility</Pill>}/></div>
+      <div className="split">
+        <Panel title="Headcount by department" action={<Button small onClick={()=>{csvDownload('cmes-headcount.csv',['Department','Code','Active','On duty','Vacancies','Monthly payroll'],departments.map(d=>[d.name,d.code,d.active,d.duty,d.vacancies,d.payroll]));notify('Headcount CSV exported.');}}>Export CSV</Button>} footer={<><span className="tiny">7 departments · 1,284 active · 29 vacancies</span><span className="tiny mono">Total $9.97M / month</span></>}>
+          <div className="card-body" style={{padding:'7px 14px'}}><span className="small muted">Live counts served to peer services on <span className="mono">GET /rosters/headcount</span></span></div>
+          <div className="table-wrap"><table className="tbl"><thead><tr><th>Department</th><th>Code</th><th>Active</th><th>On duty</th><th>Vacancies</th><th className="right">Monthly payroll → Budget</th></tr></thead><tbody>{departments.map(d=><tr key={d.code}><td><button className="link" onClick={()=>go('directory',{department:d.name})}>{d.name}</button></td><td className="mono">{d.code}</td><td><div className="row nowrap"><span className="mono" style={{minWidth:38}}>{d.active}</span><div className="bar" style={{width:138}}><span style={{width:Math.max(3,d.active/412*100)+'%'}}/></div></div></td><td className="mono">{d.duty??'—'}</td><td className="mono">{d.vacancies}</td><td className="right mono">{d.payroll}</td></tr>)}</tbody></table></div>
+        </Panel>
+        <aside className="rail">
+          <Panel title="Requires attention" action={<Pill kind="bad">5</Pill>}>{[['Blocks duty','PTR','4 Class D licences expire within 14 days','Open credential tracker →','credentials'],['Security flag','SEC','Clearance suspended for STF-0003118 — removed from patrol roster','Review profile →','profile'],['Stalled','EMS','REQ-2026-0191 has waited 6 days on a Budget decision','Open requisition →','requisitions'],['Under-covered','EMS','Sat 14 Mar — paramedic night shift is 2 short','Open roster →','roster'],['Integration','OUTBOX','3 events unpublished for more than 15 minutes',null,null]].map(([tag,code,copy,link,page])=><div className="list-row" key={tag}><div className="row"><Pill kind={tag==='Blocks duty'||tag==='Security flag'?'bad':'warn'}>{tag}</Pill><span className="eyebrow">{code}</span></div><p>{copy}</p>{link&&<button className="link" onClick={()=>go(page,page==='profile'?{person:initialStaff[1]}:{})}>{link}</button>}</div>)}</Panel>
+          <Panel title="Outbound events"><div className="list-row tiny">Azure Service Bus · exactly-once</div>{[['Staff.Onboarded v1','STF-0004217 · 09:42 → SEC, BUD','Published'],['Staff.Terminated v1','STF-0002884 · 09:17 → EMS, SEC, BUD','Published'],['Staff.Onboarded v1','STF-0004216 · 08:55 → PTR','Retrying (2)']].map(([n,d,s],i)=><div className="list-row" key={i}><div className="row space"><span className="mono teal small">{n}</span><Pill kind={s==='Published'?'ok':'warn'}>{s}</Pill></div><span className="tiny">{d}</span></div>)}<div className="notice-end">Retries are idempotent; consumers de-duplicate on event ID.</div></Panel>
+        </aside>
+      </div>
+    </div>
+  </>;
+}
+
+function Directory({ go, staff, filter, notify }) {
+  const [draft,setDraft]=useState({search:filter.search||'',department:filter.department||'All departments',service:'All services',credential:'Any'});
+  const [applied,setApplied]=useState(draft);
+  const [status,setStatus]=useState('All');
+  const [sort,setSort]=useState('Sort: Last name A–Z');
+  const update=(key,value)=>setDraft({...draft,[key]:value});
+  let rows=staff.filter(p=>(!applied.search||[p.name,p.id,p.role,p.service].some(x=>x.toLowerCase().includes(applied.search.toLowerCase())))&&(applied.department==='All departments'||p.department===applied.department)&&(applied.service==='All services'||p.service===applied.service)&&(applied.credential==='Any'||(applied.credential==='Expiring ≤ 30 days'?p.credential.includes('Expires'):p.credential===applied.credential))&&(status==='All'||p.status===status));
+  rows=[...rows].sort((a,b)=>sort==='Sort: Staff ID'?a.id.localeCompare(b.id):a.name.localeCompare(b.name));if(sort==='Sort: Hire date, newest')rows.reverse();
+  return <><Header page="directory" actions={<><Button onClick={()=>notify('Saved view: All active')}>Saved view: All active</Button><Button variant="primary" onClick={()=>go('onboard')}>Onboard employee</Button></>}/>
+    <div className="content"><div className="card card-body"><form className="filters" onSubmit={(e)=>{e.preventDefault();setApplied(draft);}}>
+      <Field label="Search"><input className="inp" placeholder="Name, staff ID, or email..." value={draft.search} onChange={e=>update('search',e.target.value)}/></Field>
+      <Field label="Department"><Select label="Department" value={draft.department} onChange={v=>update('department',v)} options={['All departments',...departments.map(d=>d.name)]}/></Field>
+      <Field label="Service"><Select label="Service" value={draft.service} onChange={v=>update('service',v)} options={['All services','Paramedic Service','Fire Suppression','Patrol Division','Bus Operations','Electrical Works','Water & Lines','HR Operations']}/></Field>
+      <Field label="Credential state"><Select label="Credential state" value={draft.credential} onChange={v=>update('credential',v)} options={['Any','Valid','Expiring ≤ 30 days','Expired','Suspended','Flagged']}/></Field><Button type="submit" variant="primary">Apply</Button>
+    </form><div className="filter-extra"><span className="eyebrow">Status</span>{[['All','1,284'],['Active','1,196'],['Probation','41'],['On leave','38'],['Suspended','9']].map(([s,n])=><button key={s} className={'chip '+(status===s?'active':'')} onClick={()=>setStatus(s)}>{s} <span className="mono">{n}</span></button>)}<span className="right-group tiny">Sample records · March 2026</span></div></div>
+      <Panel title={status==='All'?'All staff — 1,284 results':status+' staff — '+({Active:'1,196',Probation:'41','On leave':'38',Suspended:'9'}[status])+' results'} action={<div className="row"><Select label="Sort by" value={sort} onChange={setSort} options={['Sort: Last name A–Z','Sort: Hire date, newest','Sort: Staff ID']}/><Button small onClick={()=>{csvDownload('cmes-staff-sample.csv',['Staff ID','Name','Department','Service','Role','Status','Credential','Duty today'],rows.map(p=>[p.id,p.name,p.department,p.service,p.role,p.status,p.credential,p.duty]));notify('Filtered sample exported.');}}>Export</Button></div>} footer={<span className="tiny">Showing {rows.length} sample records · filters apply to sample data</span>}>
+        <div className="table-wrap"><table className="tbl"><thead><tr>{['Staff ID','Name','Department','Service · Role','Employment','Credentials','Duty today','Actions'].map(x=><th key={x}>{x}</th>)}</tr></thead><tbody>{rows.map(p=><tr key={p.id}><td className="mono nowrap">{p.id}</td><td><div className="person"><Avatar name={p.name}/><button className="link" onClick={()=>go('profile',{person:p})}>{p.name}</button></div></td><td>{p.department}</td><td>{p.service} · {p.role}</td><td><Pill>{p.status}</Pill></td><td><Pill>{p.credential}</Pill></td><td className="mono nowrap">{p.duty}</td><td><Button small onClick={()=>go('profile',{person:p})}>Open</Button></td></tr>)}</tbody></table>{!rows.length&&<div className="empty-state">No sample staff match these filters.</div>}</div>
+      </Panel><p className="tiny">Salary is never returned by this endpoint. Compensation is shared with Budget only as a department total.</p>
+    </div>
+  </>;
+}
+
+function Roster({ go, notify }) {
+  const [week,setWeek]=useState(0), [department,setDepartment]=useState('Emergency Services'), [service,setService]=useState('Paramedic Service'), [assigned,setAssigned]=useState([]), [published,setPublished]=useState(false);
+  const needed=Math.max(0,2-assigned.length);
+  const weekLabel=week===0?'Mon 9 – Sun 15 Mar 2026':'Week of '+new Date(2026,2,9+week*7).toLocaleDateString('en-CA',{day:'numeric',month:'short',year:'numeric'});
+  const assign=(name)=>{if(!assigned.includes(name)){setAssigned([...assigned,name]);setPublished(false);notify(name+' assigned to Saturday night in this demo.');}};
+  return <><Header page="roster" actions={<><Button onClick={()=>notify('Previous week copied into this draft (demo).')}>Copy last week</Button><Button variant="primary" onClick={()=>{if(needed)notify('Fill the two Saturday night slots first.');else{setPublished(true);notify('Roster published in this local demo.');}}}>Publish roster</Button></>}/>
+    <div className="content">
+      <div className="card card-body row space"><div className="row"><Field label="Department"><Select label="Roster department" value={department} onChange={setDepartment} options={departments.slice(0,4).map(d=>d.name)}/></Field><Field label="Service"><Select label="Roster service" value={service} onChange={setService} options={['Paramedic Service','Fire Suppression','Hazmat Response','Patrol Division','Bus Operations','Electrical Works']}/></Field></div><div className="row"><Button small onClick={()=>setWeek(week-1)}>‹</Button><span className="mono small">{weekLabel}</span><Button small onClick={()=>setWeek(week+1)}>›</Button><Pill kind={published?'ok':'clay'}>{published?'Published':'Draft · not published'}</Pill></div></div>
+      {needed>0&&<div className="note bad">■ <span><strong>Saturday 14 March is {needed} short.</strong> Night cover rises to 3 on weekends. Until filled, Emergency Services reads a reduced crew count from <span className="mono">GET /rosters/headcount</span>.</span></div>}
+      <div className="split"><div className="stack">
+        <Panel title="Coverage · scheduled vs required" action={<span className="tiny">Day 2 · Evening 1 · Night 2 (3 on Saturday)</span>}><div className="coverage">{['MON 9','TUE 10','WED 11','THU 12','FRI 13','SAT 14','SUN 15'].map((d,i)=><div key={d} className={'coverage-day '+(i===5&&needed?'alert':'')}><div className="eyebrow">{d}</div><div className="number">{i===5?6-needed:5} / {i===5?6:5}</div><Pill kind={i===5&&needed?'bad':'ok'}>{i===5&&needed?needed+' short':'Met'}</Pill></div>)}</div></Panel>
+        <Panel title={service+' · 9 staff'} action={<span className="tiny mono">D 06:00–14:00 &nbsp; E 14:00–22:00 &nbsp; N 22:00–06:00</span>} footer={<><span className="tiny">34 shifts · 272 hours scheduled this week</span><span className="tiny">Last edited 11 min ago by STF-0001336</span></>}><div className="table-wrap"><table className="tbl calendar-table"><thead><tr><th>Staff</th>{['Mon 9','Tue 10','Wed 11','Thu 12','Fri 13','Sat 14','Sun 15','Hrs'].map(d=><th key={d}>{d}</th>)}</tr></thead><tbody>{rosterStaff.map(p=><tr key={p.name}><td><div className="person"><span className="person-avatar">{p.initials}</span><div><button className="link mono small" onClick={()=>go('profile',{person:initialStaff.find(s=>s.name.toUpperCase()===p.name)||{id:'STF-0000000',name:p.name,department,service,role:'Paramedic',status:p.blocked?'On leave':'Active',credential:'Valid',duty:'Rostered'}})}>{p.name}</button><div className="tiny mono">{p.detail}</div></div></div></td>{p.blocked?<td colSpan="7" className="muted">On parental leave — not duty-eligible, cannot be scheduled</td>:p.shifts.map((s,i)=><td key={i}>{s?<span className={'shift '+(s==='E'?'evening':s==='N'?'night':'')}>{s}<span>{s==='D'?'06–14':s==='E'?'14–22':'22–06'}</span></span>:i===5&&assigned.some(name=>name.toUpperCase()===p.name)?<span className="shift night">N<span>22–06</span></span>:<span className="shift empty">—</span>}</td>)}<td className="mono">{p.hours+(assigned.some(name=>name.toUpperCase()===p.name)?8:0)}</td></tr>)}</tbody></table></div></Panel>
+      </div><aside className="rail">
+        <Panel title="Fill Sat 14 · night" action={<Pill kind={needed?'bad':'ok'}>{needed?needed+' needed':'Covered'}</Pill>}>{['Brennan, Órla','Haddad, Karim','Ferreira, Luísa'].map((name,i)=><div className="side-panel-row" key={name}><div><strong>{name}</strong><div className="tiny">{['ACP · valid · 24 h this week','ACP · valid · 40 h — overtime','ACP · valid · evening preference'][i]}</div></div><Button small variant={i===0?'primary':''} disabled={assigned.includes(name)||!needed} onClick={()=>assign(name)}>{assigned.includes(name)?'Assigned':'Assign'}</Button></div>)}<div className="notice-end">Candidates pass the eligibility check for this service and role.</div></Panel>
+        <Panel title="Blocked from this roster">{[['Abellard, Grace','Employment status is On leave'],['Sørensen, Elias','ACP certification expired 2 Feb 2026'],['Oyelaran, Nadia','Security flag — clearance suspended']].map(([n,d])=><div className="list-row" key={n}><strong>{n}</strong><div className="tiny">{d}</div></div>)}<div className="notice-end">Removals are automatic. HR cannot override eligibility failures here.</div></Panel>
+        <Panel title="Consumed by">{[['EMS','GET /rosters/headcount'],['SEC','GET /rosters/on-duty'],['PTR','GET /staff/active-drivers']].map(([n,d])=><div className="side-panel-row" key={n}><strong>{n}</strong><span className="mono tiny">{d}</span></div>)}</Panel>
+      </aside></div>
+    </div>
+  </>;
+}
+
+function Requisitions({ requisitions, setRequisitions, notify }) {
+  const [type,setType]=useState('Type: All'),[status,setStatus]=useState('Status: Open'),[dept,setDept]=useState('Department: All'),[selected,setSelected]=useState('REQ-2026-0191'),[modal,setModal]=useState(''),[draft,setDraft]=useState({type:'Hire',department:'Emergency Services',role:'',posts:1,reason:''});
+  const rows=requisitions.filter(r=>(type==='Type: All'||r.type===type)&&(dept==='Department: All'||r.department===dept.slice(12))&&(status==='Status: All'||(status==='Status: Open'?!['Completed','Closed — no funding'].includes(r.status):status==='Status: Completed'?r.status==='Completed':r.budget==='Rejected')));
+  const chosen=requisitions.find(r=>r.id===selected)||rows[0];
+  const update=(key,value)=>setDraft({...draft,[key]:value});
+  return <><Header page="requisitions" actions={<><Button onClick={()=>{csvDownload('cmes-requisitions.csv',['ID','Type','Department','Role','Posts','Budget','Status','Raised'],rows.map(r=>[r.id,r.type,r.department,r.role,r.posts,r.budget,r.status,r.raised]));notify('Requisitions CSV exported.');}}>Export</Button><Button variant="primary" onClick={()=>setModal('raise')}>Raise requisition</Button></>}/>
+    <div className="content"><div className="grid stats"><Stat label="Open" value="18" note="12 hire · 6 termination"/><Stat label="Awaiting Budget" value="6" note="Oldest waiting 6 days"/><Stat label="Approved, unfilled" value="9" note="14 positions remaining"/><Stat label="Closed this month" value="23" note="Median 4.2 days to decision"/></div>
+      <div className="split"><Panel title="All requisitions" action={<div className="row"><Select label="Filter by type" value={type} onChange={setType} options={['Type: All','Hire','Termination']}/><Select label="Filter by status" value={status} onChange={setStatus} options={['Status: Open','Status: All','Status: Completed','Status: Rejected']}/><Select label="Filter by department" value={dept} onChange={setDept} options={['Department: All',...departments.slice(0,4).map(d=>'Department: '+d.name)]}/></div>} footer={<span className="tiny">Showing {rows.length} sample requisitions · requests arrive from peer services and this screen</span>}>
+        <div className="table-wrap"><table className="tbl"><thead><tr>{['Requisition','Type','Requesting dept','Role','Posts','Budget','Status','Raised','Select'].map(h=><th key={h}>{h}</th>)}</tr></thead><tbody>{rows.map(r=><tr key={r.id} className={chosen?.id===r.id?'selected':''}><td className="mono nowrap">{r.id}</td><td><Pill kind={r.type==='Hire'?'info':undefined}>{r.type}</Pill></td><td>{r.department}</td><td>{r.role}</td><td className="mono">{r.posts}</td><td><Pill>{r.budget}</Pill></td><td><Pill>{r.status}</Pill></td><td className="nowrap">{r.raised}</td><td><Button small onClick={()=>setSelected(r.id)}>View</Button></td></tr>)}</tbody></table>{!rows.length&&<div className="empty-state">No sample requisitions match these filters.</div>}</div>
+      </Panel>
+      {chosen&&<aside className="rail"><Panel title={<><span className="eyebrow">Selected requisition</span><br/><span className="mono">{chosen.id}</span></>} action={<Pill kind="info">{chosen.type}</Pill>} footer={<><Button small onClick={()=>setModal('note')}>Add note</Button><Button small variant="primary" onClick={()=>notify('Budget follow-up queued in this local demo.')}>Chase Budget</Button></>}>
+        <div className="card-body"><dl className="kv"><dt>Requested by</dt><dd>{chosen.department}</dd><dt>Role</dt><dd>{chosen.role}</dd><dt>Positions</dt><dd>{chosen.posts} requested</dd><dt>Raised</dt><dd>{chosen.raised} 2026</dd><dt>Reason</dt><dd>{chosen.reason}</dd><dt>Idempotency</dt><dd className="mono tiny">{chosen.key}</dd></dl><hr className="rule"/><span className="eyebrow">Progress</span>{['Requisition received','Validated by HR',chosen.status,'Staff onboarded','Staff.Onboarded published'].map((step,i)=><div className={'step '+(i<2?'done':i===2?'current':'')} key={i}><span className="step-dot">{i<2?'✓':i===2?'•':''}</span><div>{step}<span className="tiny">{i===2?'Waiting on next decision':i>2?'Blocked until funding is confirmed':'Recorded in workflow'}</span></div></div>)}<div className="note warn">Budget’s funding decision SLA is five working days. This sample has waited six days.</div></div>
+      </Panel></aside>}</div>
+    </div>
+    {modal==='raise'&&<Dialog title="Raise requisition" action="Add to demo board" close={()=>setModal('')} submit={(e)=>{e.preventDefault();const id='REQ-2026-'+String(192+requisitions.length-6).padStart(4,'0');setRequisitions([{...draft,id,posts:Number(draft.posts),budget:'Pending',status:'Awaiting Budget',raised:'16 Mar',key:'demo-'+id.toLowerCase()},...requisitions]);setSelected(id);setModal('');notify('Requisition added to the demo board.');}}><div className="form-grid"><Field label="Type"><Select label="Requisition type" value={draft.type} onChange={v=>update('type',v)} options={['Hire','Termination']}/></Field><Field label="Department"><Select label="Requesting department" value={draft.department} onChange={v=>update('department',v)} options={departments.map(d=>d.name)}/></Field><Field label="Role"><input required className="inp" value={draft.role} onChange={e=>update('role',e.target.value)}/></Field><Field label="Positions"><input required className="inp" type="number" min="1" max="99" value={draft.posts} onChange={e=>update('posts',e.target.value)}/></Field></div><Field label="Reason"><textarea className="textarea" value={draft.reason} onChange={e=>update('reason',e.target.value)}/></Field></Dialog>}
+    {modal==='note'&&<Dialog title={'Add note · '+chosen.id} action="Save note" close={()=>setModal('')} submit={(e)=>{e.preventDefault();setModal('');notify('Note saved for this demo session.');}}><Field label="Internal note"><textarea className="textarea" required placeholder="Enter a note..."/></Field></Dialog>}
+  </>;
+}
+
+function Credentials({ credentials, setCredentials, go, notify }) {
+  const [state,setState]=useState('All'),[dept,setDept]=useState('Department: All'),[type,setType]=useState('Type: All'),[renewing,setRenewing]=useState(null),[newNumber,setNewNumber]=useState(''),[newExpiry,setNewExpiry]=useState('');
+  const rows=credentials.filter(c=>(state==='All'||(state.startsWith('Expiring')?['Critical','Expiring'].includes(c.state):c.state===state))&&(dept==='Department: All'||c.department===dept.slice(12))&&(type==='Type: All'||c.type===type.slice(6)));
+  const renew=(c)=>{setRenewing(c);setNewNumber(c.number);setNewExpiry('');};
+  return <><Header page="credentials" actions={<><Button onClick={()=>notify('Department notices queued in this local demo.')}>Notify departments</Button><Button variant="primary" onClick={()=>renew(credentials.find(c=>c.state!=='Valid')||credentials[0])}>Record renewal</Button></>}/>
+    <div className="content">
+      <div className="card card-body filter-extra" style={{margin:0,borderTop:0,paddingTop:14}}><span className="eyebrow">State</span>{[['All','1,236'],['Valid','1,142'],['Expiring ≤ 30d','23'],['Expiring ≤ 90d','61'],['Expired','7'],['Suspended','3']].map(([s,n])=><button key={s} className={'chip '+(state===s?'active':'')} onClick={()=>setState(s)}>{s} <span className="mono">{n}</span></button>)}<div className="right-group row"><Select label="Credential department" value={dept} onChange={setDept} options={['Department: All',...departments.slice(0,4).map(d=>'Department: '+d.name)]}/><Select label="Credential type" value={type} onChange={setType} options={['Type: All','Type: Class D driver licence','Type: Firearms qualification','Type: PCP certification','Type: Master electrician licence']}/></div></div>
+      <div className="split"><Panel title={state+' credentials — '+(state==='All'?'1,236':rows.length)+' records'} action={<span className="tiny">Sorted by urgency</span>} footer={<span className="tiny">Showing {rows.length} of 1,236 sample records</span>}>
+        <div className="table-wrap"><table className="tbl"><thead><tr>{['Employee','Credential','Number','Expires','Remaining','Required','State','Actions'].map(h=><th key={h}>{h}</th>)}</tr></thead><tbody>{rows.map(c=><tr key={c.number}><td><div className="person"><Avatar name={c.staff}/><div><button className="link" onClick={()=>go('profile',{person:initialStaff.find(p=>p.name===c.staff)||{id:'STF-0000000',name:c.staff,department:c.department,service:c.unit,role:c.unit.split(' · ')[1],status:'Active',credential:c.state,duty:'Not available'}})}>{c.staff}</button><div className="tiny mono">{c.unit}</div></div></div></td><td>{c.type}</td><td className="mono nowrap">{c.number}</td><td className="mono nowrap">{c.expires}</td><td className="nowrap">{c.remaining}</td><td><Pill kind="info">Yes</Pill></td><td><Pill>{c.state}</Pill></td><td><Button small onClick={()=>renew(c)}>{c.state==='Valid'?'View':'Renew'}</Button></td></tr>)}</tbody></table>{!rows.length&&<div className="empty-state">No sample credentials match these filters.</div>}</div>
+      </Panel><aside className="rail">
+        <Panel title="Blocking duty right now" action={<Pill kind="bad">3</Pill>}>{[['Sokolov, Dmitri','Backflow prevention expired — removed from 2 Water & Lines work orders'],['Sørensen, Elias','ACP certification expired — removed from paramedic roster'],['Oyelaran, Nadia','Clearance suspended by Security — patrol duty withdrawn']].map(([n,d])=><div className="list-row" key={n}><strong>{n}</strong><div className="tiny">{d}</div></div>)}<div className="notice-end">Eligibility checks return false for the affected role.</div></Panel>
+        <Panel title="By credential type"><div className="table-wrap"><table className="tbl"><thead><tr><th>Type</th><th>Held</th><th>≤ 30d</th></tr></thead><tbody>{[['Class D driver licence',248,9],['Firearms qualification',188,4],['PCP certification',96,3],['Passenger endorsement F',241,5],['Master electrician licence',41,1],['Backflow prevention',28,1]].map(([n,h,d])=><tr key={n}><td>{n}</td><td className="mono">{h}</td><td className="mono amber">{d}</td></tr>)}</tbody></table></div></Panel>
+        <Panel title="Reminder schedule" action={<Button small onClick={()=>notify('Connect the API to edit reminder rules.')}>Edit</Button>}>{[['90 days out','Employee'],['30 days out','Employee + department'],['7 days out','Employee + department + HR'],['On expiry','Eligibility revoked, rosters updated']].map(([n,d])=><div className="side-panel-row" key={n}><strong>{n}</strong><span className="tiny">{d}</span></div>)}</Panel>
+      </aside></div>
+    </div>
+    {renewing&&<Dialog title={'Record renewal · '+renewing.staff} action="Record in demo" close={()=>setRenewing(null)} submit={(e)=>{e.preventDefault();setCredentials(credentials.map(c=>c.number===renewing.number?{...c,number:newNumber,expires:newExpiry,remaining:'Renewed',state:'Valid'}:c));setRenewing(null);notify('Credential updated in this demo session.');}}><div className="note info">{renewing.type} · current expiry {renewing.expires}</div><Field label="Credential number"><input required className="inp" value={newNumber} onChange={e=>setNewNumber(e.target.value)}/></Field><Field label="New expiry"><input required className="inp" type="date" value={newExpiry} onChange={e=>setNewExpiry(e.target.value)}/></Field></Dialog>}
+  </>;
+}
+
+function CredentialTable({ rows }) {
+  return rows.length?<div className="table-wrap" style={{marginTop:14}}><table className="tbl"><thead><tr><th>Credential</th><th>Number</th><th>Expires</th><th>State</th><th>Duty impact</th></tr></thead><tbody>{rows.map(c=><tr key={c.number}><td>{c.type}</td><td className="mono">{c.number}</td><td className="mono">{c.expires}</td><td><Pill>{c.state==='Expiring'?'12 days left':c.state}</Pill></td><td>{c.type.includes('aid')?'Advisory':'Required for role'}</td></tr>)}</tbody></table></div>:<p className="muted small" style={{marginTop:14}}>No credential records in this sample. Connect the Staff API for the full profile.</p>;
+}
+function Profile({ person, credentials, go, notify }) {
+  const selected=person||initialStaff[2],marcus=selected.id==='STF-0002741';
+  const [tab,setTab]=useState('Overview'),[modal,setModal]=useState('');
+  const rows=credentials.filter(c=>c.staff===selected.name);
+  if(marcus)rows.push({type:'Passenger endorsement F',number:'PE-F-22841',expires:'2027-07-02',state:'Valid'},{type:'Standard first aid',number:'FA-SA-10233',expires:'2026-11-14',state:'Valid'});
+  return <><Header page="profile" title={selected.name} actions={<><Button onClick={()=>setModal('edit')}>Edit profile</Button><Button onClick={()=>setModal('assign')}>Assign to service</Button><Button variant="danger" onClick={()=>setModal('termination')}>Request termination</Button></>}/>
+    <div className="content"><div className="row"><span className="chip mono">{selected.id}</span><Button small onClick={()=>{navigator.clipboard?.writeText(selected.id);notify('Staff ID copied.');}}>Copy ID</Button><Pill>{selected.status}</Pill>{selected.credential.includes('Expires')&&<Pill kind="warn">Licence {selected.credential.toLowerCase()}</Pill>}</div>
+      <div className="split"><Panel title={<span className="eyebrow">Employee record</span>}><div className="tabs" role="tablist" aria-label="Employee record">{['Overview','Assignments','Credentials','Roster','Compensation','Audit trail'].map(t=><button key={t} role="tab" aria-selected={tab===t} onClick={()=>setTab(t)}>{t}</button>)}</div>
+        {tab==='Overview'&&<div className="card-body"><div className="profile-summary">
+          <div><span className="eyebrow">Identity</span><dl className="kv"><dt>Legal name</dt><dd>{selected.name.split(', ').reverse().join(' ')}</dd><dt>Known as</dt><dd>{marcus?'Marc':'—'}</dd><dt>Work email</dt><dd className="mono tiny">{selected.email||(marcus?'m.delacroix@city.example':'Available from Staff API')}</dd><dt>Citizen ID</dt><dd className="mono">{marcus?'CIT-884-2290':'Restricted'}</dd></dl></div>
+          <div><span className="eyebrow">Employment</span><dl className="kv"><dt>Status</dt><dd><Pill>{selected.status}</Pill></dd><dt>Hire date</dt><dd className="mono">{marcus?'2021-04-19':'—'}</dd><dt>Service years</dt><dd>{marcus?'4 yr 10 mo':'—'}</dd><dt>Onboarded by</dt><dd className="mono">{marcus?'REQ-2021-0442':'—'}</dd></dl></div>
+          <div><span className="eyebrow">Current posting</span><dl className="kv"><dt>Department</dt><dd>{selected.department}</dd><dt>Service</dt><dd>{selected.service}</dd><dt>Role</dt><dd>{selected.role}</dd><dt>Since</dt><dd className="mono">{marcus?'2023-09-01':'—'}</dd></dl></div>
+        </div><hr className="rule"/><div className="eyebrow">Credentials held</div><CredentialTable rows={rows}/></div>}
+        {tab==='Credentials'&&<div className="card-body"><div className="eyebrow">Credentials held</div><CredentialTable rows={rows}/><div style={{marginTop:14}}><Button small onClick={()=>go('credentials')}>Open credential tracker</Button></div></div>}
+        {tab==='Assignments'&&<div className="card-body"><h3>Current assignment</h3><dl className="kv" style={{marginTop:14}}><dt>Department</dt><dd>{selected.department}</dd><dt>Service</dt><dd>{selected.service}</dd><dt>Role</dt><dd>{selected.role}</dd><dt>State</dt><dd><Pill>{selected.status}</Pill></dd></dl></div>}
+        {tab==='Roster'&&<div className="card-body"><h3>Duty today</h3><p style={{margin:'10px 0 14px'}}>{selected.duty}</p><Button small onClick={()=>go('roster')}>Open duty roster</Button></div>}
+        {tab==='Compensation'&&<div className="card-body"><div className="note info">Individual salary belongs to HR Payroll. The Staff directory and peer services receive department totals only.</div></div>}
+        {tab==='Audit trail'&&<div className="card-body"><div className="note">Audit entries will load from the Staff API when the backend is connected.</div></div>}
+      </Panel><aside className="rail">
+        <Panel title="Duty eligibility"><div className="card-body stack"><div><Pill kind={selected.status==='Active'&&!['Expired','Flagged'].includes(selected.credential)?'ok':'bad'}>{selected.status==='Active'&&!['Expired','Flagged'].includes(selected.credential)?'Eligible for duty':'Not eligible for duty'}</Pill></div><div>✓ Employment status is <strong>{selected.status}</strong></div><div>! Credential state: <strong>{selected.credential}</strong></div><div>✓ Security flags checked by Security</div><hr className="rule"/><span className="tiny">Answered on <span className="mono">GET /staff/{selected.id}/eligibility</span>. A failed check removes the employee from rosters automatically.</span></div></Panel>
+        <Panel title="Security flags" action={<Pill kind="ok">Clear</Pill>}><div className="card-body"><dl className="kv"><dt>Background check</dt><dd>{marcus?'Passed 2021-04-02':'See Security service'}</dd><dt>Permit holds</dt><dd>None shown</dd><dt>Last sync</dt><dd>4 min ago</dd></dl><p className="tiny" style={{marginTop:18}}>Security is the source of record. HR mirrors the flag and cannot edit it here.</p></div></Panel>
+        <Panel title="Record shared with">{[['Public Transport','roster, certification'],['Security','flags, permit info'],['Budget','headcount only'],['Residence','citizen ID match']].map(([n,d])=><div className="side-panel-row" key={n}><span>{n}</span><span className="tiny mono">{d}</span></div>)}</Panel>
+      </aside></div>
+    </div>
+    {modal&&<Dialog title={{edit:'Edit profile',assign:'Assign to service',termination:'Request termination'}[modal]} action={modal==='termination'?'Create draft request':'Save demo change'} close={()=>setModal('')} submit={(e)=>{e.preventDefault();setModal('');notify('Change captured in this local demo. No backend record changed.');}}><div className="note info">This is a frontend prototype; no live employee record will change.</div>{modal==='termination'?<Field label="Reason"><textarea required className="textarea" placeholder="Reason for request..."/></Field>:<Field label={modal==='edit'?'Preferred name':'Service'}><input required className="inp" defaultValue={modal==='edit'&&marcus?'Marc':''}/></Field>}</Dialog>}
+  </>;
+}
+
+const initialForm={first:'Sofia',last:'Marchetti',known:'',dob:'1996-08-12',email:'s.marchetti@city.example',phone:'+1 519 555 0142',citizen:'CIT-901-4477',department:'Public Transport',employment:'Full-time',status:'Probation',hire:'2026-03-23',probation:'2026-09-23',service:'Bus Operations',role:'Transit Operator',assignment:'2026-03-23',payband:'PTR-OP-01'};
+function Onboard({ go, staff, setStaff, notify }) {
+  const [form,setForm]=useState(initialForm),[credentials,setCredentials]=useState([{type:'Class D driver licence',number:'DL-5120-3318',issued:'2024-02-20',expires:'2029-02-19'},{type:'Passenger endorsement F',number:'',issued:'',expires:''}]),[error,setError]=useState(''),[issued,setIssued]=useState('');
+  const change=(key,value)=>{setForm(prev=>({...prev,[key]:value}));if(key==='email')setError('');};
+  const input=(key,label,type='text',hint)=> <Field label={label} hint={hint} error={key==='email'?error:''}><input className={'inp '+(key==='email'&&error?'invalid':'')} type={type} value={form[key]} onChange={e=>change(key,e.target.value)}/></Field>;
+  const dropdown=(key,label,options,hint)=><Field label={label} hint={hint}><Select label={label} value={form[key]} onChange={v=>change(key,v)} options={options}/></Field>;
+  const updateCredential=(i,key,value)=>setCredentials(prev=>prev.map((c,j)=>i===j?{...c,[key]:value}:c));
+  const create=()=>{
+    if(!form.first.trim()||!form.last.trim()||!form.email.trim()||!form.citizen.trim()){notify('Complete legal name, email, and citizen ID.');return;}
+    if(!/^\S+@\S+\.\S+$/.test(form.email)){setError('Enter a valid work email.');return;}
+    if(form.email.toLowerCase()==='s.marchetti@city.example'||staff.some(p=>p.email?.toLowerCase()===form.email.toLowerCase())){setError('409 — already held by STF-0003902. Work email must be unique across the city.');return;}
+    const id='STF-'+String(4218+staff.length-initialStaff.length).padStart(7,'0');
+    setStaff([{id,name:form.last+', '+form.first,email:form.email,department:form.department,service:form.service,role:form.role,status:form.status,credential:credentials.some(c=>!c.number||!c.expires)?'Missing':'Valid',duty:'Not rostered'},...staff]);setIssued(id);notify('Demo employee created: '+id+'. No server request was made.');
+  };
+  return <><Header page="onboard" actions={<><Button onClick={()=>notify('Draft kept for this browser session.')}>Save draft</Button><Button variant="primary" onClick={create}>Create employee & issue ID</Button></>}/>
+    <div className="content"><div className="note info"><span><strong>Filling position 2 of 2 on <span className="mono">REQ-2026-0188</span></strong> — Public Transport · Transit Operator. Budget approved this requisition on 4 March; no further funding check is needed. <button className="link" onClick={()=>go('requisitions')}>Open requisition</button></span></div>
+      <div className="split"><div className="stack">
+        <Panel title="1 · Identity" action={<span className="tiny">Required before an ID can be issued</span>}><div className="form-section form-grid">{input('first','Legal first name')}{input('last','Legal last name')}{input('known','Known as','text','optional')}{input('dob','Date of birth','date')}{input('email','Work email','email')}{input('phone','Personal phone','tel')}{input('citizen','Citizen ID','text','matched against Residence')}{dropdown('department','Home department',departments.map(d=>d.name))}</div></Panel>
+        <Panel title="2 · Employment & assignment"><div className="form-section form-grid">{dropdown('employment','Employment type',['Full-time','Part-time','Seasonal','Contract'])}{dropdown('status','Employment status',['Probation','Active'])}{input('hire','Hire date','date')}{input('probation','Probation ends','date')}{dropdown('service','Service',['Bus Operations','Depot Services','Fleet Maintenance','Paramedic Service','Fire Suppression','Patrol Division','Electrical Works'])}{dropdown('role','Role title',['Transit Operator','Yard Attendant','Dispatcher','Primary Care Paramedic','Constable','Licensed Electrician'])}{input('assignment','Assignment start','date')}{dropdown('payband','Pay band',['PTR-OP-01','PTR-OP-02','PTR-OP-03'],'HR Payroll only')}</div></Panel>
+        <Panel title="3 · Credentials" action={<Button small onClick={()=>setCredentials([...credentials,{type:'Standard first aid',number:'',issued:'',expires:''}])}>Add credential</Button>}>
+          <div className="card-body"><div className="note warn">Transit Operator requires a <strong>Class D driver licence</strong> and a <strong>Passenger endorsement F</strong>. Until both are valid, the employee is created but cannot be rostered.</div></div>
+          <div className="table-wrap"><table className="tbl"><thead><tr><th>Type</th><th>Number</th><th>Issued</th><th>Expires</th><th>Required</th><th>Remove</th></tr></thead><tbody>{credentials.map((c,i)=><tr key={i}><td><Select label={'Credential type '+(i+1)} value={c.type} onChange={v=>updateCredential(i,'type',v)} options={['Class D driver licence','Passenger endorsement F','Standard first aid']}/></td><td><input className="inp" aria-label={'Credential number '+(i+1)} value={c.number} onChange={e=>updateCredential(i,'number',e.target.value)}/></td><td><input className="inp" aria-label={'Issued date '+(i+1)} type="date" value={c.issued} onChange={e=>updateCredential(i,'issued',e.target.value)}/></td><td><input className="inp" aria-label={'Expiry date '+(i+1)} type="date" value={c.expires} onChange={e=>updateCredential(i,'expires',e.target.value)}/></td><td><Pill kind={c.number&&c.expires?'ok':'warn'}>{c.number&&c.expires?'Yes':'Missing'}</Pill></td><td><Button small onClick={()=>setCredentials(credentials.filter((_,j)=>j!==i))}>Remove</Button></td></tr>)}</tbody></table></div>
+          <div className="card-foot"><Button onClick={()=>go('directory')}>Cancel</Button><div className="row"><Button onClick={()=>notify('Draft kept for this browser session.')}>Save draft</Button><Button variant="primary" onClick={create}>Create employee & issue ID</Button></div></div>
+        </Panel>
+      </div><aside className="rail">
+        <Panel title="Municipal staff ID" action={<Pill kind={issued?'ok':'clay'}>{issued?'Issued':'Not yet issued'}</Pill>}><div className="card-body"><div className="big-id"><div className="eyebrow">{issued?'ISSUED IN DEMO':'NEXT IN SEQUENCE'}</div>{issued||'STF-0004218'}</div><dl className="kv"><dt>Format</dt><dd className="mono">STF-0000000</dd><dt>Source</dt><dd>Single municipal sequence</dd><dt>Scope</dt><dd>City-wide, all departments</dd><dt>Reuse</dt><dd>Never, even after termination</dd></dl><hr className="rule"/><p className="tiny">The ID has no department code. A transfer between departments must not change it.</p></div></Panel>
+        <Panel title="Budget authority" action={<Pill kind="ok">Approved</Pill>}><div className="card-body"><dl className="kv"><dt>Requisition</dt><dd className="mono">REQ-2026-0188</dd><dt>Decision</dt><dd>Approved 2026-03-04</dd><dt>Positions</dt><dd>2 approved · 1 filled · <strong>1 remaining</strong></dd><dt>Pay band cap</dt><dd className="mono">PTR-OP-03</dd></dl></div></Panel>
+        <Panel title="On save"><div className="card-body">{[['1','Write Staff row and allocate ID'],['2','Create StaffAssignment to Bus Operations'],['3','Queue Staff.Onboarded v1 in outbox'],['4','Decrement open headcount on requisition'],['5','Append an AuditLog entry']].map(([n,d])=><div className="step" key={n}><span className="step-dot">{n}</span><span>{d}</span></div>)}<p className="tiny">Intended API workflow; this frontend does not execute these server steps.</p></div></Panel>
+      </aside></div>
+    </div>
+  </>;
+}
+
+const currentPage=()=>['overview','directory','roster','requisitions','credentials','profile','onboard'].includes(location.hash.slice(1))?location.hash.slice(1):'overview';
+export default function App() {
+  const [page,setPage]=useState(currentPage),[context,setContext]=useState({}),[staff,setStaff]=useState(initialStaff),[requisitions,setRequisitions]=useState(initialRequisitions),[credentials,setCredentials]=useState(initialCredentials),[message,setMessage]=useState('');
+  useEffect(()=>{const handle=()=>setPage(currentPage());window.addEventListener('hashchange',handle);return ()=>window.removeEventListener('hashchange',handle);},[]);
+  useEffect(()=>{if(!message)return;const timer=setTimeout(()=>setMessage(''),3500);return ()=>clearTimeout(timer);},[message]);
+  const go=(next,data={})=>{setContext(data);setPage(next);location.hash=next;window.scrollTo({top:0,behavior:'instant'});};
+  const active=page==='profile'||page==='onboard'?'directory':page;
+  return <div className="app"><aside className="side"><a className="brand" href="#overview" onClick={e=>{e.preventDefault();go('overview');}}><span className="brand-mark">HR</span><span className="brand-text"><strong>CMES</strong><span>Staff & HR</span></span></a>
+    <nav className="nav" aria-label="Main">{menu.map(([key,label,count])=><a key={key} href={'#'+key} aria-current={active===key?'page':undefined} onClick={e=>{e.preventDefault();go(key);}}><span>{label}</span>{count&&<span className={'badge '+(key==='credentials'?'warn':'')}>{count}</span>}</a>)}</nav>
+    <div className="side-bottom"><span className="eyebrow">Demo · March 2026 snapshot</span><div className="who"><span className="avatar">MA</span><div><strong>M. Arseneau</strong><span>HR Admin · HRS</span></div></div></div>
+  </aside><main className="main">
+    {page==='overview'&&<Overview go={go} notify={setMessage}/>}
+    {page==='directory'&&<Directory key={JSON.stringify(context)} go={go} staff={staff} filter={context} notify={setMessage}/>}
+    {page==='roster'&&<Roster go={go} notify={setMessage}/>}
+    {page==='requisitions'&&<Requisitions requisitions={requisitions} setRequisitions={setRequisitions} notify={setMessage}/>}
+    {page==='credentials'&&<Credentials credentials={credentials} setCredentials={setCredentials} go={go} notify={setMessage}/>}
+    {page==='profile'&&<Profile key={context.person?.id} person={context.person} credentials={credentials} go={go} notify={setMessage}/>}
+    {page==='onboard'&&<Onboard go={go} staff={staff} setStaff={setStaff} notify={setMessage}/>}
+  </main>{message&&<div className="toast" role="status" aria-live="polite">{message}</div>}</div>;
+}
