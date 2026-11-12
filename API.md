@@ -324,3 +324,18 @@ All required; `expiryDate` must be after `issueDate`. `201` → `Credential` · 
 
 At least one field. `suspended: true` suspends; `false` lifts the suspension.
 `200` → `Credential` · `400` · `404` · `422`
+
+## Audit
+
+Every create, update and delete of a staff member, assignment, roster entry, requisition, credential,
+security flag or compensation record writes an audit row in the same transaction. A rejected request writes none.
+Seeded records show actor `system`.
+
+### `GET /audit?entityType=&entityId=&actorId=&page=&pageSize=`
+
+Newest first. `entityId` is the public id: a staff number, a requisition number or the numeric id.
+`pageSize` 1–100, default 50.
+
+`200` → `PagedResult<{ auditId, entityType, entityId, action, actorId, timestampUtc }>` · `400` · `422`
+
+`action` is `Created`, `Updated` or `Deleted`.

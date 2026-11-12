@@ -13,6 +13,7 @@ using System.Text.Json.Serialization;
 using CSCN73030_26F_Sec1_ProjectV_Group_6.Server.Application;
 using CSCN73030_26F_Sec1_ProjectV_Group_6.Server.Application.Services;
 using CSCN73030_26F_Sec1_ProjectV_Group_6.Server.Data;
+using CSCN73030_26F_Sec1_ProjectV_Group_6.Server.Data.Auditing;
 using CSCN73030_26F_Sec1_ProjectV_Group_6.Server.Data.Repositories;
 using CSCN73030_26F_Sec1_ProjectV_Group_6.Server.Data.Seeding;
 using CSCN73030_26F_Sec1_ProjectV_Group_6.Server.Infrastructure;
@@ -73,8 +74,12 @@ builder.Services.AddOpenApi(options =>
 });
 
 // ---- Database -------------------------------------------------------------------------------
-builder.Services.AddDbContext<CmesDbContext>(options =>
-    options.UseSqlServer(builder.Configuration.GetConnectionString("StaffHr")));
+builder.Services.AddHttpContextAccessor();
+builder.Services.AddScoped<ICurrentUser, HttpCurrentUser>();
+builder.Services.AddScoped<AuditInterceptor>();
+builder.Services.AddDbContext<CmesDbContext>((services, options) => options
+    .UseSqlServer(builder.Configuration.GetConnectionString("StaffHr"))
+    .AddInterceptors(services.GetRequiredService<AuditInterceptor>()));
 builder.Services.AddHealthChecks().AddDbContextCheck<CmesDbContext>("database");
 
 // ---- Application layers ---------------------------------------------------------------------
@@ -87,6 +92,7 @@ builder.Services.AddScoped<AssignmentRepository>();
 builder.Services.AddScoped<RosterRepository>();
 builder.Services.AddScoped<RequisitionRepository>();
 builder.Services.AddScoped<CredentialRepository>();
+builder.Services.AddScoped<AuditRepository>();
 
 builder.Services.AddScoped<StaffService>();
 builder.Services.AddScoped<DepartmentService>();
@@ -94,6 +100,7 @@ builder.Services.AddScoped<AssignmentService>();
 builder.Services.AddScoped<RosterService>();
 builder.Services.AddScoped<RequisitionService>();
 builder.Services.AddScoped<CredentialService>();
+builder.Services.AddScoped<AuditService>();
 builder.Services.AddScoped<DatabaseSeeder>();
 
 var app = builder.Build();
