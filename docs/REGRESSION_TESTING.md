@@ -8,7 +8,7 @@ The Staff/HR service has two automated test suites. Run both before every releas
 | Client (React) | Vitest + Testing Library | `cscn73030-26f-sec1-projectv-group-6.client/src/*.test.jsx` |
 
 The server suite has 342 test cases: 22 for the original template sample and 320 for the Staff/HR backend
-(83 unit cases and 237 API cases).
+(80 unit cases and 240 API cases).
 
 ## Prerequisites
 
