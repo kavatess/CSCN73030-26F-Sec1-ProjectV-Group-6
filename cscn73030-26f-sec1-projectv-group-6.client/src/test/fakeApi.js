@@ -126,7 +126,7 @@ function defaultRoutes() {
       (!query.credentialState || s.credentialState === query.credentialState) &&
       (!query.q || `${s.firstName} ${s.lastName} ${s.staffNumber} ${s.email}`.toLowerCase().includes(query.q.toLowerCase()))), query),
     'GET /staff/:n': ({ params }) => (params[0] === profile.staffNumber ? profile
-      : staff.some((s) => s.staffNumber === params[0]) ? { ...profile, ...staff.find((s) => s.staffNumber === params[0]), assignments: [], credentials: [] }
+      : staff.some((s) => s.staffNumber === params[0]) ? { ...profile, preferredName: null, ...staff.find((s) => s.staffNumber === params[0]), assignments: [], credentials: [] }
         : problem(404, `Staff '${params[0]}' was not found.`)),
     'GET /staff/:n/eligibility': ({ params }) => ({ staffNumber: params[0], eligible: true, at: '2026-11-05T12:00:00Z', serviceId: null, reasons: [], warnings: [] }),
     'GET /staff/:n/security-flags': ({ params }) => securityFlags.filter((f) => f.staffNumber === params[0]),
