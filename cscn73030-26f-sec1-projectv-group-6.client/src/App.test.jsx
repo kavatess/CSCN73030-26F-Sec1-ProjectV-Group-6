@@ -108,15 +108,52 @@ describe('CMES Staff & HR frontend', () => {
     expect(await screen.findByText(/Individual salary belongs to HR Payroll/)).toBeTruthy();
   });
 
-  it('requires coverage before a draft roster can be published', () => {
+  it('shows this week\'s roster with eligibility and adds a shift after checking it', async () => {
+    const today = new Date(); today.setHours(7, 0, 0, 0);
+    const shift = { rosterEntryId:5, staffNumber:'STF-0000001', staffName:'Talia Brennwood', serviceId:1, serviceName:'Paramedic Service', shiftStart:today.toISOString(), shiftEnd:new Date(today.getTime() + 12 * 3600000).toISOString(), shiftType:'Day', status:'Scheduled' };
+    server = fakeApi({
+      'GET /rosters': [shift],
+      'GET /staff/:n/eligibility': ({ params, query }) => params[0] === 'STF-0000005'
+        ? { staffNumber:params[0], eligible:false, serviceId:Number(query.service), reasons:[{ code:'CREDENTIAL_EXPIRED', message:'ACP licence expired.' }], warnings:[] }
+        : { staffNumber:params[0], eligible:true, serviceId:Number(query.service), reasons:[], warnings:[] },
+      'POST /rosters/entries': ({ body }) => body.staffNumber === 'STF-0000001'
+        ? problem(409, 'STF-0000001 is already rostered, which overlaps this shift.')
+        : reply(201, { rosterEntryId:6, ...body }),
+    });
+    window.location.hash = '#roster';
     render(<App />);
-    fireEvent.click(screen.getByRole('link', { name:'Duty roster' }));
-    fireEvent.click(screen.getByRole('button', { name:'Publish roster' }));
-    expect(screen.getByText(/Fill the two Saturday night slots first/)).toBeTruthy();
-    fireEvent.click(screen.getAllByRole('button', { name:'Assign' })[0]);
-    fireEvent.click(screen.getAllByRole('button', { name:'Assign' })[0]);
-    fireEvent.click(screen.getByRole('button', { name:'Publish roster' }));
-    expect(screen.getByText('Published')).toBeTruthy();
+    expect(await screen.findByRole('button', { name:'BRENNWOOD, TALIA' })).toBeTruthy();
+    expect(screen.getByTitle(/Day .* · Scheduled/)).toBeTruthy();
+    expect(await screen.findByText('ACP licence expired.')).toBeTruthy();
+    expect(server.calls).toContainEqual(expect.objectContaining({ path:'/rosters', query:expect.objectContaining({ service:'1' }) }));
+
+    const candidates = screen.getAllByRole('button', { name:'Assign' });
+    fireEvent.click(candidates[0]);
+    const dialog = screen.getByRole('form', { name:'Add shift · Paramedic Service' });
+    fireEvent.change(within(dialog).getByRole('combobox', { name:'Employee' }), { target:{ value:'STF-0000001' } });
+    fireEvent.click(within(dialog).getByRole('button', { name:'Add shift' }));
+    expect(await within(dialog).findByText(/overlaps this shift/)).toBeTruthy();
+    fireEvent.change(within(dialog).getByRole('combobox', { name:'Employee' }), { target:{ value:'STF-0000002' } });
+    fireEvent.change(within(dialog).getByRole('combobox', { name:'Shift type' }), { target:{ value:'Night' } });
+    fireEvent.click(within(dialog).getByRole('button', { name:'Add shift' }));
+    expect(await screen.findByText(/Night shift added for STF-0000002/)).toBeTruthy();
+    const post = server.calls.filter(c => c.method === 'POST').at(-1);
+    expect(post.body).toMatchObject({ staffNumber:'STF-0000002', serviceId:1, shiftType:'Night' });
+    expect((new Date(post.body.shiftEnd) - new Date(post.body.shiftStart)) / 3600000).toBe(12);
+    expect(server.calls).toContainEqual(expect.objectContaining({ path:'/staff/STF-0000002/eligibility', query:expect.objectContaining({ service:'1' }) }));
+  });
+
+  it('refuses to roster someone who is not eligible', async () => {
+    server = fakeApi({ 'GET /staff/:n/eligibility': ({ params }) => ({ staffNumber:params[0], eligible:false, reasons:[{ code:'EMPLOYMENT_STATUS', message:'Employment status is OnLeave.' }], warnings:[] }) });
+    window.location.hash = '#roster';
+    render(<App />);
+    await screen.findByRole('button', { name:'BRENNWOOD, TALIA' });
+    fireEvent.click(screen.getByRole('button', { name:'Add shift' }));
+    const dialog = screen.getByRole('form', { name:'Add shift · Paramedic Service' });
+    fireEvent.change(within(dialog).getByRole('combobox', { name:'Employee' }), { target:{ value:'STF-0000001' } });
+    fireEvent.click(within(dialog).getByRole('button', { name:'Add shift' }));
+    expect(await within(dialog).findByText(/Not eligible for duty: Employment status is OnLeave/)).toBeTruthy();
+    expect(server.calls.some(c => c.method === 'POST')).toBe(false);
   });
 
   it('onboards an employee, records credentials and fills the requisition', async () => {
