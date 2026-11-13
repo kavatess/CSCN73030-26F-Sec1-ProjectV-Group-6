@@ -1,6 +1,6 @@
 # CMES Staff/HR Service
 
-Backend for the Staff/HR service of the City Management Enterprise System (CSCN73030 Project V, Group 6).
+Backend and React frontend for the Staff/HR service of the City Management Enterprise System (CSCN73030 Project V, Group 6).
 It is the single source of truth for municipal employees: departments, services, staff, assignments,
 duty rosters, hire and termination requisitions, credentials, duty eligibility, security flags and payroll.
 It publishes `Staff.Onboarded` / `Staff.Terminated` events, keeps an audit log, and is secured with Entra ID roles.
@@ -9,6 +9,7 @@ It publishes `Staff.Onboarded` / `Staff.Terminated` events, keeps an audit log, 
 - **Swagger UI (Development):** `https://localhost:7038/swagger` (or `http://localhost:5058/swagger`)
 - **Raw OpenAPI document:** `/openapi/v1.json`
 - **Architecture and rules:** [docs/BACKEND.md](docs/BACKEND.md) · **Azure deployment:** [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md)
+- **React client (the HR screens):** [cscn73030-26f-sec1-projectv-group-6.client/README.md](cscn73030-26f-sec1-projectv-group-6.client/README.md)
 
 ## Prerequisites
 
@@ -90,10 +91,17 @@ dotnet run --project CSCN73030-26F-Sec1-ProjectV-Group-6.Server --launch-profile
 ```
 
 Open `https://localhost:7038/swagger`. Check `https://localhost:7038/health` reports the database as `Healthy`.
-The launch profile also starts the React dev server through SpaProxy, as before.
-In Visual Studio, pressing F5 on the solution does the same.
+The launch profile also starts the React client through SpaProxy at `https://localhost:54552`: the seven
+Staff & HR screens, reading and writing this API. In Visual Studio, pressing F5 on the solution does the same.
 
-If your machine has no trusted HTTPS dev certificate, use `--launch-profile http` and `http://localhost:5058/swagger`.
+If your machine has no trusted HTTPS dev certificate, use `--launch-profile http` and `http://localhost:5058/swagger`,
+then start the client yourself from `cscn73030-26f-sec1-projectv-group-6.client`:
+
+```bash
+ASPNETCORE_URLS=http://localhost:5058 npm run dev
+```
+
+and open `http://localhost:54552`.
 
 **No token needed locally.** In the Development environment every request is signed in as `dev-user` with all roles,
 so Swagger and the React client just work. To try a restricted caller, send headers such as
@@ -121,6 +129,13 @@ and a table of every test case, are in [docs/REGRESSION_TESTING.md](docs/REGRESS
 
 ```bash
 dotnet test CSCN73030-26F-Sec1-ProjectV-Group-6.Server.Tests
+```
+
+The React client has its own tests (Vitest and Testing Library, against a fake API, so no server is needed). From
+`cscn73030-26f-sec1-projectv-group-6.client`:
+
+```bash
+npm test
 ```
 
 Code documentation is generated with Doxygen (install Doxygen and Graphviz first). The backend overview page is
@@ -154,6 +169,9 @@ always looks current.
 ## Project layout
 
 ```
+cscn73030-26f-sec1-projectv-group-6.client/
+  src/api.js        API client used by every screen.
+  src/pages/        One React module per screen (overview, directory, profile, onboarding, roster, ...).
 CSCN73030-26F-Sec1-ProjectV-Group-6.Server/
   Controllers/      HTTP endpoints and their role policies. Thin: call one service method, return the result.
   Contracts/        Request and response DTOs (the JSON shapes in API.md).
