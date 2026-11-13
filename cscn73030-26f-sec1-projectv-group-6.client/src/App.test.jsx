@@ -119,11 +119,57 @@ describe('CMES Staff & HR frontend', () => {
     expect(screen.getByText('Published')).toBeTruthy();
   });
 
-  it('shows the duplicate work email validation on onboarding', () => {
+  it('onboards an employee, records credentials and fills the requisition', async () => {
+    server = fakeApi({
+      'GET /requisitions': [{ requisitionNumber:'REQ-0000002', type:'Hire', department:{ code:'EMS', name:'Emergency Services' }, roleTitle:'Primary Care Paramedic', positions:2, positionsFilled:1, status:'Filling', budgetDecision:'Approved', createdAtUtc:'2026-09-30T12:00:00Z' }],
+      'POST /staff': ({ body }) => reply(201, { ...body, staffNumber:'STF-0000021' }),
+      'POST /staff/:n/credentials': ({ body }) => reply(201, { credentialId:99, ...body }),
+      'PATCH /requisitions/:n': ({ body }) => ({ requisitionNumber:'REQ-0000002', ...body }),
+    });
+    window.location.hash = '#onboard';
     render(<App />);
-    fireEvent.click(screen.getByRole('link', { name:'Staff directory' }));
-    fireEvent.click(screen.getByRole('button', { name:'Onboard employee' }));
+    await screen.findByRole('option', { name:/REQ-0000002/ });
+    fireEvent.change(screen.getByRole('combobox', { name:'Fills requisition' }), { target:{ value:'REQ-0000002' } });
+    expect(screen.getByText(/Filling position 2 of 2/)).toBeTruthy();
+    fireEvent.change(screen.getByLabelText('Legal first name'), { target:{ value:'Sofia' } });
+    fireEvent.change(screen.getByLabelText('Legal last name'), { target:{ value:'Marchetti' } });
+    fireEvent.change(screen.getByLabelText('Date of birth'), { target:{ value:'1996-08-12' } });
+    fireEvent.change(screen.getByLabelText('Work email'), { target:{ value:'sofia.marchetti@cmes.example' } });
+    await screen.findByRole('option', { name:'Paramedic Service' });
+    fireEvent.change(screen.getByRole('combobox', { name:'Service' }), { target:{ value:'1' } });
+    await screen.findByRole('option', { name:'CPR & First Aid Certificate' });
+    fireEvent.change(screen.getByRole('combobox', { name:'Credential type 1' }), { target:{ value:'3' } });
+    fireEvent.change(screen.getByLabelText('Credential number 1'), { target:{ value:'CPR-1' } });
+    fireEvent.change(screen.getByLabelText('Issued date 1'), { target:{ value:'2026-01-01' } });
+    fireEvent.change(screen.getByLabelText('Expiry date 1'), { target:{ value:'2028-01-01' } });
     fireEvent.click(screen.getAllByRole('button', { name:'Create employee & issue ID' })[0]);
-    expect(screen.getByText(/already held by STF-0003902/)).toBeTruthy();
+    expect(await screen.findByText('STF-0000021')).toBeTruthy();
+    const post = server.calls.find(c => c.method === 'POST' && c.path === '/staff');
+    expect(post.body).toMatchObject({ firstName:'Sofia', homeDepartmentCode:'EMS', employmentStatus:'Probation', initialAssignment:{ serviceId:1, roleTitle:'Primary Care Paramedic' } });
+    expect(server.calls).toContainEqual(expect.objectContaining({ method:'POST', path:'/staff/STF-0000021/credentials', body:expect.objectContaining({ credentialTypeId:3, number:'CPR-1' }) }));
+    expect(server.calls.filter(c => c.method === 'PATCH').map(c => c.body)).toEqual([{ positionsFilled:2 }, { status:'Completed' }]);
+    expect(await screen.findByText('REQ-0000002: 2 of 2 positions filled')).toBeTruthy();
+  });
+
+  it('shows the 409 for a work email that is already in use', async () => {
+    server = fakeApi({ 'POST /staff': problem(409, "Email 'des@cmes.example' is already used by STF-0000002.") });
+    window.location.hash = '#onboard';
+    render(<App />);
+    await screen.findByRole('option', { name:'Emergency Services' });
+    fireEvent.change(screen.getByLabelText('Legal first name'), { target:{ value:'Des' } });
+    fireEvent.change(screen.getByLabelText('Legal last name'), { target:{ value:'Again' } });
+    fireEvent.change(screen.getByLabelText('Date of birth'), { target:{ value:'1990-01-01' } });
+    fireEvent.change(screen.getByLabelText('Work email'), { target:{ value:'des@cmes.example' } });
+    fireEvent.change(screen.getByRole('combobox', { name:'Home department' }), { target:{ value:'EMS' } });
+    fireEvent.click(screen.getAllByRole('button', { name:'Create employee & issue ID' })[0]);
+    expect(await screen.findByText(/already used by STF-0000002/)).toBeTruthy();
+  });
+
+  it('asks for the required fields before calling the API', async () => {
+    window.location.hash = '#onboard';
+    render(<App />);
+    fireEvent.click(screen.getAllByRole('button', { name:'Create employee & issue ID' })[0]);
+    expect(screen.getByText('Legal first name is required.')).toBeTruthy();
+    expect(server.calls.some(c => c.method === 'POST')).toBe(false);
   });
 });

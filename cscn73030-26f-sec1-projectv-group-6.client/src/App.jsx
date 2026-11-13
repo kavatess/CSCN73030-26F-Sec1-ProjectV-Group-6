@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { initialStaff, initialRequisitions, initialCredentials } from './demoData';
+import { initialRequisitions, initialCredentials } from './demoData';
 import Overview from './pages/Overview';
 import Directory from './pages/Directory';
 import Roster from './pages/Roster';
@@ -17,7 +17,7 @@ const pages=['overview','directory','roster','requisitions','credentials','profi
 /** "#profile/STF-0000002" → { page:'profile', id:'STF-0000002' }. Unknown hashes open the overview. */
 const parseHash=(hash)=>{const [name,id='']=hash.replace(/^#/,'').split('/');return pages.includes(name)?{page:name,id:decodeURIComponent(id)}:{page:'overview',id:''};};
 export default function App() {
-  const [hash,setHash]=useState(()=>location.hash),[context,setContext]=useState({}),[staff,setStaff]=useState(initialStaff),[requisitions,setRequisitions]=useState(initialRequisitions),[credentials,setCredentials]=useState(initialCredentials),[message,setMessage]=useState('');
+  const [hash,setHash]=useState(()=>location.hash),[context,setContext]=useState({}),[requisitions,setRequisitions]=useState(initialRequisitions),[credentials,setCredentials]=useState(initialCredentials),[message,setMessage]=useState('');
   const {page,id}=parseHash(hash);
   useEffect(()=>{const handle=()=>setHash(location.hash);window.addEventListener('hashchange',handle);return ()=>window.removeEventListener('hashchange',handle);},[]);
   useEffect(()=>{if(!message)return;const timer=setTimeout(()=>setMessage(''),3500);return ()=>clearTimeout(timer);},[message]);
@@ -37,6 +37,6 @@ export default function App() {
     {page==='requisitions'&&<Requisitions requisitions={requisitions} setRequisitions={setRequisitions} notify={setMessage}/>}
     {page==='credentials'&&<Credentials credentials={credentials} setCredentials={setCredentials} go={go} notify={setMessage}/>}
     {page==='profile'&&<Profile key={id} staffNumber={id} go={go} notify={setMessage}/>}
-    {page==='onboard'&&<Onboard go={go} staff={staff} setStaff={setStaff} notify={setMessage}/>}
+    {page==='onboard'&&<Onboard go={go} notify={setMessage}/>}
   </main>{message&&<div className="toast" role="status" aria-live="polite">{message}</div>}</div>;
 }
