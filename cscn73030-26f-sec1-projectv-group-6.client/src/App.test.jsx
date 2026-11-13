@@ -1,14 +1,14 @@
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import App from './App.jsx';
-import { fakeApi, problem, reply, requisitions } from './test/fakeApi.js';
+import { credentials, fakeApi, problem, reply, requisitions } from './test/fakeApi.js';
 
 let server;
 beforeEach(() => {
   window.history.replaceState(null, '', '/');
   server = fakeApi();
 });
-afterEach(cleanup);
+afterEach(() => { cleanup(); vi.restoreAllMocks(); });
 
 describe('CMES Staff & HR frontend', () => {
   it('renders the workforce overview from the live headcount and payroll endpoints', async () => {
@@ -189,6 +189,35 @@ describe('CMES Staff & HR frontend', () => {
     expect(posts).toHaveLength(2);
     expect(posts[0].headers['Idempotency-Key']).toBe(posts[1].headers['Idempotency-Key']);
     expect(posts[1].body).toEqual({ type:'Hire', departmentCode:'EMS', roleTitle:'Paramedic', positions:3, reasonCode:'VACANCY' });
+  });
+
+  it('tracks credentials by state and records a renewal', async () => {
+    server = fakeApi({ 'PATCH /credentials/:id': ({ params, body }) => ({ ...credentials.find(c => String(c.credentialId) === params[0]), ...body, status:'Valid', daysUntilExpiry:700 }) });
+    window.location.hash = '#credentials';
+    render(<App />);
+    expect(await screen.findByRole('button', { name:'Expired 1' })).toBeTruthy();
+    const blocking = screen.getByRole('heading', { name:'Blocking duty right now' }).closest('section');
+    expect(within(blocking).getByText('Noor Abernathy')).toBeTruthy();
+    fireEvent.click(screen.getByRole('button', { name:'Expired 1' }));
+    expect(await screen.findByText('Expired credentials — 1 records')).toBeTruthy();
+    expect(server.calls).toContainEqual(expect.objectContaining({ path:'/credentials', query:expect.objectContaining({ state:'Expired' }) }));
+    fireEvent.click(screen.getByRole('button', { name:'Renew' }));
+    const dialog = screen.getByRole('form', { name:'Record renewal · Saoirse Delacroix' });
+    fireEvent.change(within(dialog).getByLabelText('New expiry'), { target:{ value:'2028-10-01' } });
+    fireEvent.click(within(dialog).getByRole('button', { name:'Record renewal' }));
+    expect(await screen.findByText(/renewed — now valid/)).toBeTruthy();
+    expect(server.calls.find(c => c.method === 'PATCH')).toMatchObject({ path:'/credentials/18', body:{ number:'FAKE-1018', expiryDate:'2028-10-01' } });
+  });
+
+  it('suspends a credential after confirmation', async () => {
+    server = fakeApi({ 'PATCH /credentials/:id': ({ body }) => ({ ...credentials[0], ...body, status:'Suspended' }) });
+    vi.spyOn(window, 'confirm').mockReturnValue(true);
+    window.location.hash = '#credentials';
+    render(<App />);
+    await screen.findByText('FAKE-1003');
+    fireEvent.click(within(screen.getByText('FAKE-1003').closest('tr')).getByRole('button', { name:'Suspend' }));
+    await waitFor(() => expect(server.calls.find(c => c.method === 'PATCH')).toMatchObject({ path:'/credentials/4', body:{ suspended:true } }));
+    expect(window.confirm).toHaveBeenCalledWith(expect.stringMatching(/fail the duty eligibility check/));
   });
 
   it('onboards an employee, records credentials and fills the requisition', async () => {
