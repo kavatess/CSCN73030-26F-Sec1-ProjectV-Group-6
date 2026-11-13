@@ -1,19 +1,39 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { cleanup, fireEvent, render, screen, within } from '@testing-library/react';
 import App from './App.jsx';
+import { fakeApi } from './test/fakeApi.js';
 
+let server;
 beforeEach(() => {
   window.history.replaceState(null, '', '/');
+  server = fakeApi();
 });
 afterEach(cleanup);
 
 describe('CMES Staff & HR frontend', () => {
-  it('renders the workforce overview and its seven department counts', () => {
+  it('renders the workforce overview from the live headcount and payroll endpoints', async () => {
     render(<App />);
     expect(screen.getByRole('heading', { name:'Workforce overview' })).toBeTruthy();
     const table = screen.getByRole('table');
+    expect(await within(table).findByRole('button', { name:'Emergency Services' })).toBeTruthy();
     expect(within(table).getAllByRole('row')).toHaveLength(8);
-    expect(within(table).getByText('412')).toBeTruthy();
+    expect(within(table).getByText('$525,000')).toBeTruthy();
+    expect(await screen.findByText('1 awaiting Budget')).toBeTruthy();
+    expect(screen.getByText(/UnderInvestigation|Under investigation/)).toBeTruthy();
+    expect(await screen.findByText('Connected')).toBeTruthy();
+    expect(server.calls.map(c => c.path)).toEqual(expect.arrayContaining(['/departments/headcount', '/headcounts/payroll', '/credentials/expiring']));
+  });
+
+  it('says when the payroll totals need the Payroll role', async () => {
+    server = fakeApi({ 'GET /headcounts/payroll': { __reply:true, status:403, body:{ title:'Forbidden', status:403 } } });
+    render(<App />);
+    expect((await screen.findAllByText('Payroll role only')).length).toBe(7);
+  });
+
+  it('shows an error when the API cannot be reached', async () => {
+    server = fakeApi({ 'GET /departments/headcount': () => { throw new TypeError('offline'); } });
+    render(<App />);
+    expect(await screen.findByRole('alert')).toBeTruthy();
   });
 
   it('filters the staff directory and opens the selected employee', () => {
