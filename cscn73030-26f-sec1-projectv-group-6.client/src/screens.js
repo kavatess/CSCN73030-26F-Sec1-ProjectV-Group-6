@@ -4,7 +4,7 @@
  */
 
 export const labels = { overview:'Workforce overview', directory:'Staff directory', roster:'Duty roster', requisitions:'Requisitions', credentials:'Credentials & licence expiry', profile:'Employee profile', onboard:'Onboard employee' };
-export const routes = { overview:'CITY MANAGEMENT ENTERPRISE SYSTEM', directory:'GET /STAFF?DEPARTMENT=&SERVICE=&ROLE=&STATUS=&PAGE=', roster:'GET /ROSTERS?SERVICE=PARAMEDIC&FROM=2026-03-09&TO=2026-03-15', requisitions:'POST /REQUISITIONS · GET /REQUISITIONS?STATUS=', credentials:'GET /CREDENTIALS?STATE=&EXPIRESBEFORE=', profile:'← STAFF DIRECTORY / GET /STAFF/STF-0002741', onboard:'← STAFF DIRECTORY / POST /STAFF' };
+export const routes = { overview:'CITY MANAGEMENT ENTERPRISE SYSTEM', directory:'GET /STAFF', roster:'GET /ROSTERS', requisitions:'POST /REQUISITIONS · GET /REQUISITIONS', credentials:'GET /CREDENTIALS', profile:'← STAFF DIRECTORY / GET /STAFF/{STAFFNUMBER}', onboard:'← STAFF DIRECTORY / POST /STAFF' };
 export function csvDownload(name, headings, rows) {
   const quote = (v) => '"' + String(v??'').replaceAll('"','""') + '"';
   const text = [headings,...rows].map(row=>row.map(quote).join(',')).join('\r\n');
