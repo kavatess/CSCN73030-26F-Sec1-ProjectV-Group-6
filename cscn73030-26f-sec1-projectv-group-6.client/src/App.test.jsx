@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import App from './App.jsx';
-import { fakeApi, problem, reply } from './test/fakeApi.js';
+import { fakeApi, problem, reply, requisitions } from './test/fakeApi.js';
 
 let server;
 beforeEach(() => {
@@ -154,6 +154,41 @@ describe('CMES Staff & HR frontend', () => {
     fireEvent.click(within(dialog).getByRole('button', { name:'Add shift' }));
     expect(await within(dialog).findByText(/Not eligible for duty: Employment status is OnLeave/)).toBeTruthy();
     expect(server.calls.some(c => c.method === 'POST')).toBe(false);
+  });
+
+  it('lists requisitions and moves one through the workflow', async () => {
+    server = fakeApi({ 'PATCH /requisitions/:n': ({ params, body }) => ({ ...requisitions.find(r => r.requisitionNumber === params[0]), ...body }) });
+    render(<App />);
+    fireEvent.click(screen.getByRole('link', { name:/Requisitions/ }));
+    expect((await screen.findAllByText('Bus Operator')).length).toBeGreaterThan(0);
+    expect(screen.queryByText('Patrol Constable')).toBeNull(); // rejected, so not open
+    expect(screen.getByText('Oldest waiting', { exact:false })).toBeTruthy();
+    fireEvent.click(screen.getByRole('button', { name:'Budget approved' }));
+    await waitFor(() => expect(server.calls.some(c => c.method === 'PATCH')).toBe(true));
+    expect(server.calls.find(c => c.method === 'PATCH')).toMatchObject({ path:'/requisitions/REQ-0000004', body:{ budgetDecision:'Approved', status:'Approved' } });
+    fireEvent.change(screen.getByRole('combobox', { name:'Filter by status' }), { target:{ value:'' } });
+    expect((await screen.findAllByText('Patrol Constable')).length).toBeGreaterThan(0);
+  });
+
+  it('raises a hire requisition and reuses its idempotency key on retry', async () => {
+    let attempts = 0;
+    server = fakeApi({ 'POST /requisitions': ({ body }) => (++attempts === 1 ? problem(503, 'Service unavailable') : reply(201, { ...body, requisitionNumber:'REQ-0000007', status:'Received', department:{ code:'EMS', name:'Emergency Services' }, positionsFilled:0, createdAtUtc:'2026-11-05T12:00:00Z' })) });
+    window.location.hash = '#requisitions';
+    render(<App />);
+    await screen.findAllByText('Bus Operator');
+    fireEvent.click(screen.getByRole('button', { name:'Raise requisition' }));
+    const dialog = screen.getByRole('form', { name:'Raise requisition' });
+    fireEvent.change(within(dialog).getByRole('combobox', { name:'Requesting department' }), { target:{ value:'EMS' } });
+    fireEvent.change(within(dialog).getByLabelText('Role'), { target:{ value:'Paramedic' } });
+    fireEvent.change(within(dialog).getByLabelText('Positions'), { target:{ value:'3' } });
+    fireEvent.click(within(dialog).getByRole('button', { name:'Raise requisition' }));
+    expect(await within(dialog).findByText('Service unavailable')).toBeTruthy();
+    fireEvent.click(within(dialog).getByRole('button', { name:'Raise requisition' }));
+    expect(await screen.findByText('Requisition REQ-0000007 raised.')).toBeTruthy();
+    const posts = server.calls.filter(c => c.method === 'POST');
+    expect(posts).toHaveLength(2);
+    expect(posts[0].headers['Idempotency-Key']).toBe(posts[1].headers['Idempotency-Key']);
+    expect(posts[1].body).toEqual({ type:'Hire', departmentCode:'EMS', roleTitle:'Paramedic', positions:3, reasonCode:'VACANCY' });
   });
 
   it('onboards an employee, records credentials and fills the requisition', async () => {
