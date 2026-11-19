@@ -24,11 +24,22 @@ param entraTenantId string = subscription().tenantId
 @description('Application ID URI of the Staff/HR API app registration.')
 param entraAudience string = 'api://cmes-staff-hr'
 
-@description('Application (client) id of the Staff/HR API app registration.')
-param entraClientId string
+@description('Application (client) id of the Staff/HR API app registration. Leave empty until it exists.')
+param entraClientId string = ''
 
-@description('App Service plan SKU.')
+@description('App Service plan SKU: F1 (free), B1 (basic) or larger.')
 param appServiceSku string = 'B1'
+
+@description('''Use the Azure SQL Database free offer (serverless, 100,000 vCore-seconds and 32 GB a month, auto-pauses
+when the allowance runs out instead of billing). false = Basic tier (about 5 USD a month).''')
+param sqlFreeOffer bool = false
+
+@description('Create the Service Bus namespace and staff-events topic. Without it, events are written to the app log.')
+param enableServiceBus bool = true
+
+@description('''Demo mode: no sign-in and Swagger is on. For fictional demo data
+only, until the CMES login service issues tokens. Every request gets every role. Never use it with real employee records.''')
+param demoMode bool = false
 
 var suffix = uniqueString(resourceGroup().id)
 var webAppName = '${namePrefix}-api-${suffix}'
@@ -36,6 +47,9 @@ var keyVaultName = take('kv${replace(namePrefix, '-', '')}${suffix}', 24)
 var sqlServerName = '${namePrefix}-sql-${suffix}'
 var serviceBusName = '${namePrefix}-sb-${suffix}'
 var databaseName = 'CmesStaffHr'
+// Always On and the health probe keep the app (and so the database) busy. Off for F1 (not supported)
+// and for the free SQL offer (they would use up its allowance).
+var keepWarm = !sqlFreeOffer && !contains(['F1', 'D1'], appServiceSku)
 
 // Built-in role definition ids.
 var keyVaultSecretsUserRole = '4633458b-17de-408a-b874-0445c86b69e6'
@@ -79,10 +93,22 @@ resource sqlDatabase 'Microsoft.Sql/servers/databases@2023-08-01-preview' = {
   parent: sqlServer
   name: databaseName
   location: location
-  sku: {
-    name: 'S0'
-    tier: 'Standard'
-  }
+  // The free offer needs a serverless General Purpose database. It must be allowed to pause when idle,
+  // otherwise the monthly allowance lasts about two days.
+  sku: sqlFreeOffer
+    ? { name: 'GP_S_Gen5', tier: 'GeneralPurpose', family: 'Gen5', capacity: 2 }
+    : { name: 'Basic', tier: 'Basic' }
+  properties: sqlFreeOffer
+    ? {
+        useFreeLimit: true
+        freeLimitExhaustionBehavior: 'AutoPause'
+        autoPauseDelay: 60
+        minCapacity: json('0.5')
+        maxSizeBytes: 34359738368 // 32 GB, the free-offer limit
+      }
+    : {
+        maxSizeBytes: 2147483648 // 2 GB, the Basic limit
+      }
 }
 
 // 0.0.0.0 - 0.0.0.0 is Azure's convention for "allow Azure services", which lets the App Service connect.
@@ -97,7 +123,7 @@ resource sqlAllowAzure 'Microsoft.Sql/servers/firewallRules@2023-08-01-preview' 
 
 // ---- Messaging --------------------------------------------------------------------------------
 
-resource serviceBus 'Microsoft.ServiceBus/namespaces@2022-10-01-preview' = {
+resource serviceBus 'Microsoft.ServiceBus/namespaces@2022-10-01-preview' = if (enableServiceBus) {
   name: serviceBusName
   location: location
   sku: {
@@ -109,7 +135,7 @@ resource serviceBus 'Microsoft.ServiceBus/namespaces@2022-10-01-preview' = {
   }
 }
 
-resource staffEvents 'Microsoft.ServiceBus/namespaces/topics@2022-10-01-preview' = {
+resource staffEvents 'Microsoft.ServiceBus/namespaces/topics@2022-10-01-preview' = if (enableServiceBus) {
   parent: serviceBus
   name: 'staff-events'
   properties: {
@@ -141,7 +167,7 @@ resource connectionStringSecret 'Microsoft.KeyVault/vaults/secrets@2023-07-01' =
   parent: keyVault
   name: 'ConnectionStrings--StaffHr'
   properties: {
-    value: 'Server=tcp:${sqlServer.properties.fullyQualifiedDomainName},1433;Database=${databaseName};User ID=${sqlAdminLogin};Password=${sqlAdminPassword};Encrypt=True;TrustServerCertificate=False;Connection Timeout=30;'
+    value: 'Server=tcp:${sqlServer.properties.fullyQualifiedDomainName},1433;Database=${databaseName};User ID=${sqlAdminLogin};Password=${sqlAdminPassword};Encrypt=True;TrustServerCertificate=False;Connection Timeout=60;'
   }
 }
 
@@ -170,21 +196,24 @@ resource webApp 'Microsoft.Web/sites@2023-12-01' = {
     httpsOnly: true
     siteConfig: {
       linuxFxVersion: 'DOTNETCORE|10.0'
-      alwaysOn: true
-      healthCheckPath: '/health'
+      alwaysOn: keepWarm
+      // The health probe queries the database every minute, which would keep a free-offer database awake.
+      healthCheckPath: keepWarm ? '/health' : null
       minTlsVersion: '1.2'
       ftpsState: 'Disabled'
-      appSettings: [
-        { name: 'ASPNETCORE_ENVIRONMENT', value: 'Production' }
+      appSettings: concat([
+        // The app only accepts the no-token sign-in in the Development environment.
+        { name: 'ASPNETCORE_ENVIRONMENT', value: demoMode ? 'Development' : 'Production' }
         { name: 'KeyVault__Uri', value: keyVault.properties.vaultUri }
         { name: 'APPLICATIONINSIGHTS_CONNECTION_STRING', value: appInsights.properties.ConnectionString }
-        { name: 'Messaging__ServiceBus__FullyQualifiedNamespace', value: '${serviceBus.name}.servicebus.windows.net' }
-        { name: 'Messaging__ServiceBus__TopicName', value: staffEvents.name }
-        { name: 'Authentication__Mode', value: 'EntraId' }
+        { name: 'Authentication__Mode', value: demoMode ? 'Development' : 'EntraId' }
         { name: 'Authentication__EntraId__TenantId', value: entraTenantId }
         { name: 'Authentication__EntraId__Audience', value: entraAudience }
         { name: 'Authentication__EntraId__ClientId', value: entraClientId }
-      ]
+      ], enableServiceBus ? [
+        { name: 'Messaging__ServiceBus__FullyQualifiedNamespace', value: '${serviceBusName}.servicebus.windows.net' }
+        { name: 'Messaging__ServiceBus__TopicName', value: 'staff-events' }
+      ] : [])
     }
   }
 }
@@ -200,7 +229,7 @@ resource webAppReadsSecrets 'Microsoft.Authorization/roleAssignments@2022-04-01'
   }
 }
 
-resource webAppSendsEvents 'Microsoft.Authorization/roleAssignments@2022-04-01' = {
+resource webAppSendsEvents 'Microsoft.Authorization/roleAssignments@2022-04-01' = if (enableServiceBus) {
   name: guid(serviceBus.id, webApp.id, serviceBusDataSenderRole)
   scope: serviceBus
   properties: {
@@ -214,4 +243,6 @@ output webAppName string = webApp.name
 output webAppUrl string = 'https://${webApp.properties.defaultHostName}'
 output keyVaultName string = keyVault.name
 output sqlServerName string = sqlServer.name
-output serviceBusNamespace string = '${serviceBus.name}.servicebus.windows.net'
+output sqlServerFqdn string = sqlServer.properties.fullyQualifiedDomainName
+output databaseName string = databaseName
+output serviceBusNamespace string = enableServiceBus ? '${serviceBusName}.servicebus.windows.net' : ''

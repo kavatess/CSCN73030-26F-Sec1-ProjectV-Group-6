@@ -5,7 +5,8 @@
     "namePrefix": { "value": "cmes-staffhr" },
     "sqlAdminLogin": { "value": "staffhradmin" },
     "entraAudience": { "value": "api://cmes-staff-hr" },
-    "entraClientId": { "value": "00000000-0000-0000-0000-000000000000" },
-    "appServiceSku": { "value": "B1" }
+    "appServiceSku": { "value": "F1" },
+    "sqlFreeOffer": { "value": true },
+    "enableServiceBus": { "value": false }
   }
 }
