@@ -29,13 +29,26 @@ az identity create --resource-group "$RESOURCE_GROUP" --name "$IDENTITY_NAME" --
 CLIENT_ID=$(az identity show --resource-group "$RESOURCE_GROUP" --name "$IDENTITY_NAME" --query clientId -o tsv)
 PRINCIPAL_ID=$(az identity show --resource-group "$RESOURCE_GROUP" --name "$IDENTITY_NAME" --query principalId -o tsv)
 # Trust tokens GitHub issues to jobs in this repository's "production" environment (the workflow uses it).
-if ! az identity federated-credential show --resource-group "$RESOURCE_GROUP" --identity-name "$IDENTITY_NAME" \
-     --name github-production --output none 2>/dev/null; then
-  az identity federated-credential create --resource-group "$RESOURCE_GROUP" --identity-name "$IDENTITY_NAME" \
-    --name github-production \
-    --issuer https://token.actions.githubusercontent.com \
-    --subject "repo:${REPOSITORY}:environment:production" \
+# GitHub writes the token subject in one of two forms, depending on the repository's OIDC settings:
+#   repo:owner/name:environment:production                      (classic)
+#   repo:owner@<owner id>/name@<repository id>:environment:production   (with immutable ids)
+# so register both. The ids come from the public GitHub API.
+trust() {   # trust <credential name> <subject>
+  if az identity federated-credential show --resource-group "$RESOURCE_GROUP" --identity-name "$IDENTITY_NAME" \
+       --name "$1" --output none 2>/dev/null; then verb=update; else verb=create; fi
+  az identity federated-credential "$verb" --resource-group "$RESOURCE_GROUP" --identity-name "$IDENTITY_NAME" \
+    --name "$1" --issuer https://token.actions.githubusercontent.com --subject "$2" \
     --audiences api://AzureADTokenExchange --output none
+  echo "    trusts $2"
+}
+trust github-production "repo:${REPOSITORY}:environment:production"
+REPO_JSON=$(curl -fsS "https://api.github.com/repos/${REPOSITORY}" 2>/dev/null || true)
+REPO_ID=$(echo "$REPO_JSON" | sed -n 's/^  "id": \([0-9]*\),$/\1/p' | head -1)
+OWNER_ID=$(echo "$REPO_JSON" | sed -n 's/^    "id": \([0-9]*\),$/\1/p' | head -1)
+if [ -n "$REPO_ID" ] && [ -n "$OWNER_ID" ]; then
+  trust github-production-ids "repo:${REPOSITORY%%/*}@${OWNER_ID}/${REPOSITORY#*/}@${REPO_ID}:environment:production"
+else
+  echo "    (could not read the repository ids from GitHub; if sign-in fails with AADSTS700213, see docs/DEPLOYMENT.md)"
 fi
 
 echo "4/4 Permissions on the resource group only"

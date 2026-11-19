@@ -114,7 +114,7 @@ overwrites existing data.
 | Error | Fix |
 | --- | --- |
 | `RequestDisallowedByPolicy` / location not allowed | Use a region from step 1 (delete and recreate the resource group there). |
-| `AADSTS70021` / no matching federated identity | The workflow must run in the `production` environment of this exact repository; re-run `setup-azure.sh` with `REPOSITORY=owner/name`. |
+| `AADSTS700213` / `AADSTS70021`: no matching federated identity record | The error shows the subject GitHub sent. Re-run `setup-azure.sh` (it registers both the classic `repo:owner/name:…` and the immutable-id `repo:owner@id/name@id:…` forms), or add that exact subject to the identity's federated credentials. The workflow must run in the `production` environment. |
 | Free offer not available for this subscription | Re-run with *sql_free_offer* unticked (Basic tier). |
 | SQL password rejected | It needs 3 of: upper case, lower case, digits, symbols, and at least 8 characters. |
 | Smoke test times out on F1 | The free plan is slow to start; re-run, or choose `B1`. |
