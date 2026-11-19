@@ -93,6 +93,7 @@ merge `production` into `master` first. Then: Actions → **Deploy to Azure** �
 | --- | --- | --- |
 | resource_group | `cmes-staffhr-rg` | Where to deploy |
 | app_service_sku | `F1` | `F1` free, `B1` paid |
+| app_location | empty | Region for the web app only, when the resource group's region has no App Service quota |
 | sql_free_offer | on | Free serverless database; off for Basic |
 | demo_mode | on | No sign-in, every role (fictional data only) |
 | seed_demo_data | on | Load the fictional demo data if the database is empty |
@@ -117,7 +118,7 @@ overwrites existing data.
 | `AADSTS700213` / `AADSTS70021`: no matching federated identity record | The error shows the subject GitHub sent. Re-run `setup-azure.sh` (it registers both the classic `repo:owner/name:…` and the immutable-id `repo:owner@id/name@id:…` forms), or add that exact subject to the identity's federated credentials. The workflow must run in the `production` environment. |
 | Free offer not available for this subscription | Re-run with *sql_free_offer* unticked (Basic tier). |
 | SQL password rejected | It needs 3 of: upper case, lower case, digits, symbols, and at least 8 characters. |
-| `SubscriptionIsOverQuotaForSku` … Current Limit (F1 App Service instances): 0 | The subscription has no free-plan quota in that region (common on student subscriptions). Re-run with *app_service_sku* `B1`, or request an F1 quota of 1 on the portal's Quotas page (Provider: App Service). |
+| `SubscriptionIsOverQuotaForSku` … Current Limit (F1 or B1 App Service instances): 0 | App Service quota is per region, and student subscriptions often have none in some regions. In Cloud Shell run `bash find-app-region.sh` (from `infra/`): it checks every allowed region without creating anything. Re-run the workflow with *app_location* set to a region it reports OK (the database stays where it is), or request a quota of 1 on the portal's Quotas page (Provider: App Service). |
 | Smoke test times out on F1 | The free plan is slow to start; re-run, or choose `B1`. |
 
 ## Configuration reference

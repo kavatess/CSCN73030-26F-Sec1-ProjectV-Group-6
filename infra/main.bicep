@@ -11,6 +11,10 @@ param namePrefix string = 'cmes-staffhr'
 @description('Azure region. Defaults to the resource group region.')
 param location string = resourceGroup().location
 
+@description('''Region for the App Service plan and web app only. App Service quota is per region, and student
+subscriptions often have none in some regions; use infra/find-app-region.sh to find one. Defaults to location.''')
+param appServiceLocation string = location
+
 @description('SQL Server administrator login.')
 param sqlAdminLogin string = 'staffhradmin'
 
@@ -175,7 +179,7 @@ resource connectionStringSecret 'Microsoft.KeyVault/vaults/secrets@2023-07-01' =
 
 resource plan 'Microsoft.Web/serverfarms@2023-12-01' = {
   name: '${namePrefix}-plan-${suffix}'
-  location: location
+  location: appServiceLocation
   kind: 'linux'
   sku: {
     name: appServiceSku
@@ -187,7 +191,7 @@ resource plan 'Microsoft.Web/serverfarms@2023-12-01' = {
 
 resource webApp 'Microsoft.Web/sites@2023-12-01' = {
   name: webAppName
-  location: location
+  location: appServiceLocation
   identity: {
     type: 'SystemAssigned'
   }
