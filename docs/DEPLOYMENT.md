@@ -58,18 +58,18 @@ API app registration (step 4 below).
    ```
 
    Use your region from step 1. The script (`infra/setup-azure.sh`) creates resource group
-   `cmes-staffhr-rg`, registers the resource providers, and creates an app registration that GitHub Actions
-   signs in with through a federated credential (no password), with Contributor and User Access Administrator
-   on that resource group only. If the repository is private, upload the file to Cloud Shell instead of `curl`.
-   If your school directory doesn't let students create app registrations, the script fails at step 3/4; ask
-   your instructor to create it, or run the template from Cloud Shell yourself.
+   `cmes-staffhr-rg`, registers the resource providers, and creates the identity GitHub Actions signs in with:
+   a user-assigned managed identity `cmes-staffhr-github-deploy` with a federated credential (no password),
+   given Contributor and User Access Administrator on that resource group only. A managed identity is an
+   Azure resource, so this works even where the school directory doesn't let students create app
+   registrations. Running the script again is safe.
 
 3. **Repository secrets** (GitHub → Settings → Secrets and variables → Actions → New repository secret).
    The script prints the first three:
 
    | Secret | Value |
    | --- | --- |
-   | `AZURE_CLIENT_ID` | Client id of the deployment identity |
+   | `AZURE_CLIENT_ID` | Client id of the deployment managed identity |
    | `AZURE_TENANT_ID` | Tenant id |
    | `AZURE_SUBSCRIPTION_ID` | Subscription id |
    | `SQL_ADMIN_PASSWORD` | A password you make up for the SQL administrator: 12+ characters with upper- and lower-case letters and digits, without `;` `'` `"` |
