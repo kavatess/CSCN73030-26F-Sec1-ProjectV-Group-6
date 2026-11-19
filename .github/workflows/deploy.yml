@@ -95,7 +95,23 @@ jobs:
           # Same connection string the template stores in Key Vault for the app.
           connection="Server=tcp:${{ steps.infra.outputs.sql_fqdn }},1433;Database=${{ steps.infra.outputs.database }};User ID=staffhradmin;Password=${SQL_ADMIN_PASSWORD};Encrypt=True;TrustServerCertificate=False;Connection Timeout=120;"
           echo "::add-mask::$connection"
-          ./efbundle --connection "$connection"
+          # A free-offer (serverless) database pauses after an hour without connections. The first connection
+          # wakes it, but until it is back online (usually under a minute) SQL answers error 40613. Retry.
+          for attempt in 1 2 3 4 5 6 7 8 9 10; do
+            if ./efbundle --connection "$connection" > efbundle.log 2>&1; then
+              grep -E "Applying migration|No migrations|Done" efbundle.log || true
+              break
+            fi
+            if [ "$attempt" = 10 ]; then
+              cat efbundle.log
+              echo "::error::The database is still unavailable after 5 minutes. Its state:"
+              az sql db show -g "${{ inputs.resource_group }}" -s "${{ steps.infra.outputs.sql_server }}" \
+                -n "${{ steps.infra.outputs.database }}" --query "{status:status, sku:currentSku.name, freeLimitExhaustion:freeLimitExhaustionBehavior}" -o table
+              exit 1
+            fi
+            echo "Database not ready yet ($(grep -o 'Error Number:[0-9]*' efbundle.log | head -1 || echo 'no error number')); attempt $attempt of 10, retrying in 30 s"
+            sleep 30
+          done
           if [ "${{ inputs.seed_demo_data }}" = "true" ]; then
             # --seed loads the fictional demo data and exits; it does nothing if the database already has data.
             ConnectionStrings__StaffHr="$connection" ASPNETCORE_ENVIRONMENT=Development \
