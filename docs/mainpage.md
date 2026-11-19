@@ -40,26 +40,34 @@ digraph arch {
     rankdir=LR;
     node [shape=box, style=rounded, fontname=Helvetica, fontsize=10];
     browser [label="Browser"];
-    client [label="React client\n(App.jsx)"];
-    api [label="ASP.NET Core API\n(Program.cs)"];
-    ctrl [label="Controllers"];
-    model [label="Models"];
+    client [label="React client"];
+    ctrl [label="Controllers\n+ Contracts (DTOs)"];
+    svc [label="Application services\n(rules, validation)"];
+    repo [label="Repositories\n(EF Core)"];
+    db [label="SQL Server"];
     browser -> client [label="loads"];
-    client -> api [label="fetch(JSON)"];
-    api -> ctrl [label="routes"];
-    ctrl -> model [label="returns"];
+    client -> ctrl [label="fetch(JSON)"];
+    ctrl -> svc [label="calls"];
+    svc -> repo [label="reads / writes"];
+    repo -> db [label="SQL"];
 }
 \enddot
+
+The server's layers, folders and business rules are described in @ref backend "Backend features and structure".
 
 During development the server starts the Vite dev server through SpaProxy. The client calls the API
 with a relative URL, so the same code works behind the Vite proxy and when served by ASP.NET.
 
-## Current state (release v0.1.0-sprint1)
+## Current state
 
-The application still contains the project template's weather-forecast sample:
-WeatherForecastController, WeatherForecast and App. It shows the controller and client patterns the
-Staff/HR features will follow and is covered by regression tests. No Staff/HR features are
-implemented yet; see @ref REGRESSION_TESTING.md "Regression testing" for the test cases.
+The Staff/HR backend is feature-complete for the brief: staff, departments and services, assignments, duty
+rosters, hire and termination requisitions, credentials, duty eligibility, security-flag sync, payroll for Budget,
+an audit log, `Staff.Onboarded` / `Staff.Terminated` events through a transactional outbox, Entra ID authentication
+with app roles and department-scoped data, telemetry, and Azure deployment. See
+@ref backend "Backend features and structure" and @ref deployment "Deploying to Azure". `README.md` explains how to
+run it locally and `API.md` is the contract for other groups. Every feature has regression tests:
+see @ref REGRESSION_TESTING.md "Regression testing". The template's weather-forecast sample is still present
+because its original tests cover it.
 
 ## Requirements
 

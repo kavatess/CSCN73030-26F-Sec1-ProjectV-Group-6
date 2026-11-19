@@ -1,0 +1,18 @@
+# Local SQL Server for developers who can't use LocalDB (macOS, Linux, or no Visual Studio).
+# Start:  docker compose up -d
+# Then point the API at it with the ConnectionStrings__StaffHr variable shown in README.md.
+# The password below is for this throwaway local container only. Never reuse it anywhere real.
+services:
+  sqlserver:
+    image: mcr.microsoft.com/mssql/server:2022-latest
+    container_name: cmes-staffhr-sql
+    environment:
+      ACCEPT_EULA: "Y"
+      MSSQL_SA_PASSWORD: "LocalDev_Passw0rd!"
+    ports:
+      - "1433:1433"
+    volumes:
+      - cmes-staffhr-sql:/var/opt/mssql
+
+volumes:
+  cmes-staffhr-sql:

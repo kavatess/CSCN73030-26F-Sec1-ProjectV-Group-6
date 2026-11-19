@@ -20,6 +20,7 @@ jobs:
         with:
           node-version: 22
 
+      # The backend API tests start SQL Server in Docker (Testcontainers); ubuntu-latest runners have Docker.
       - name: Run server tests
         run: dotnet test CSCN73030-26F-Sec1-ProjectV-Group-6.Server.Tests --logger "console;verbosity=normal"
 
