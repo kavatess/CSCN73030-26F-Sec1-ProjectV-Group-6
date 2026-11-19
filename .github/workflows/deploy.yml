@@ -1,7 +1,7 @@
 name: Deploy to Azure
 
 # Manual: Actions tab > "Deploy to Azure" > Run workflow. See docs/DEPLOYMENT.md for the one-time setup
-# (resource group, Entra ID app registration, federated credential and the repository secrets below).
+# (resource group, deployment identity with a federated credential, and the repository secrets below).
 on:
   workflow_dispatch:
     inputs:
@@ -9,6 +9,23 @@ on:
         description: Azure resource group to deploy into
         required: true
         default: cmes-staffhr-rg
+      app_service_sku:
+        description: App Service plan (F1 is free; B1 is faster and costs about 13 USD a month)
+        type: choice
+        options: [F1, B1]
+        default: F1
+      sql_free_offer:
+        description: Use the free Azure SQL offer (untick for the Basic tier, about 5 USD a month)
+        type: boolean
+        default: true
+      demo_mode:
+        description: Demo mode - no sign-in, fictional data only (until the CMES login service is ready)
+        type: boolean
+        default: true
+      seed_demo_data:
+        description: Load the fictional demo data (only if the database is empty)
+        type: boolean
+        default: true
 
 permissions:
   id-token: write   # OIDC sign-in to Azure, no stored Azure password
@@ -45,10 +62,14 @@ jobs:
             --parameters infra/main.parameters.json \
             --parameters sqlAdminPassword="${{ secrets.SQL_ADMIN_PASSWORD }}" \
                          entraClientId="${{ secrets.STAFFHR_API_CLIENT_ID }}" \
+                         appServiceSku="${{ inputs.app_service_sku }}" \
+                         sqlFreeOffer=${{ inputs.sql_free_offer }} \
+                         demoMode=${{ inputs.demo_mode }} \
             --query properties.outputs -o json)
           echo "web_app=$(echo "$outputs" | jq -r .webAppName.value)" >> "$GITHUB_OUTPUT"
-          echo "key_vault=$(echo "$outputs" | jq -r .keyVaultName.value)" >> "$GITHUB_OUTPUT"
           echo "sql_server=$(echo "$outputs" | jq -r .sqlServerName.value)" >> "$GITHUB_OUTPUT"
+          echo "sql_fqdn=$(echo "$outputs" | jq -r .sqlServerFqdn.value)" >> "$GITHUB_OUTPUT"
+          echo "database=$(echo "$outputs" | jq -r .databaseName.value)" >> "$GITHUB_OUTPUT"
           echo "web_url=$(echo "$outputs" | jq -r .webAppUrl.value)" >> "$GITHUB_OUTPUT"
 
       - name: Build the app and the migration bundle
@@ -58,15 +79,22 @@ jobs:
           dotnet ef migrations bundle --project CSCN73030-26F-Sec1-ProjectV-Group-6.Server \
             --configuration Release --self-contained -r linux-x64 -o efbundle --force
 
-      - name: Apply database migrations
+      - name: Apply database migrations (and seed the demo data)
+        env:
+          SQL_ADMIN_PASSWORD: ${{ secrets.SQL_ADMIN_PASSWORD }}
         run: |
           runner_ip=$(curl -s https://api.ipify.org)
           az sql server firewall-rule create -g "${{ inputs.resource_group }}" -s "${{ steps.infra.outputs.sql_server }}" \
             -n github-runner --start-ip-address "$runner_ip" --end-ip-address "$runner_ip"
-          connection=$(az keyvault secret show --vault-name "${{ steps.infra.outputs.key_vault }}" \
-            --name ConnectionStrings--StaffHr --query value -o tsv)
+          # Same connection string the template stores in Key Vault for the app.
+          connection="Server=tcp:${{ steps.infra.outputs.sql_fqdn }},1433;Database=${{ steps.infra.outputs.database }};User ID=staffhradmin;Password=${SQL_ADMIN_PASSWORD};Encrypt=True;TrustServerCertificate=False;Connection Timeout=120;"
           echo "::add-mask::$connection"
           ./efbundle --connection "$connection"
+          if [ "${{ inputs.seed_demo_data }}" = "true" ]; then
+            # --seed loads the fictional demo data and exits; it does nothing if the database already has data.
+            ConnectionStrings__StaffHr="$connection" ASPNETCORE_ENVIRONMENT=Development \
+              dotnet publish/CSCN73030-26F-Sec1-ProjectV-Group-6.Server.dll --seed
+          fi
 
       - name: Remove the temporary SQL firewall rule
         if: always()
@@ -82,9 +110,13 @@ jobs:
 
       - name: Smoke test
         run: |
-          for attempt in 1 2 3 4 5 6; do
-            status=$(curl -s -o /dev/null -w '%{http_code}' "${{ steps.infra.outputs.web_url }}/health")
-            [ "$status" = "200" ] && echo "Healthy" && exit 0
+          # The first request starts the app (and resumes a paused free-offer database), so allow a few minutes.
+          for attempt in 1 2 3 4 5 6 7 8 9 10; do
+            status=$(curl -s -o /dev/null -m 120 -w '%{http_code}' "${{ steps.infra.outputs.web_url }}/health")
+            [ "$status" = "200" ] && echo "Healthy: ${{ steps.infra.outputs.web_url }}" && exit 0
             sleep 20
           done
           echo "Health check returned $status" && exit 1
+
+      - name: Summary
+        run: echo "Deployed to ${{ steps.infra.outputs.web_url }}" >> "$GITHUB_STEP_SUMMARY"
