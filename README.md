@@ -65,7 +65,7 @@ The password is only for that throwaway local container (see `docker-compose.yml
 ### 3. Migrate
 
 ```bash
-dotnet ef database update --project CSCN73030-26F-Sec1-ProjectV-Group-6.Server
+dotnet ef database update --project CSCN73030-26F-Sec1-ProjectV-Group-6.Server --context CmesDbContext
 ```
 
 This creates the database, all 12 tables and the two number sequences from the single `InitialCreate` migration.
@@ -81,7 +81,7 @@ It does nothing if the database already has departments, so it is safe to run tw
 database and seed again:
 
 ```bash
-dotnet ef database drop --force --project CSCN73030-26F-Sec1-ProjectV-Group-6.Server
+dotnet ef database drop --force --project CSCN73030-26F-Sec1-ProjectV-Group-6.Server --context CmesDbContext
 ```
 
 ### 5. Run
@@ -215,7 +215,7 @@ A request flows **Controller → Service → Repository → DbContext**. Service
 ## Adding a migration
 
 ```bash
-dotnet ef migrations add <Name> --project CSCN73030-26F-Sec1-ProjectV-Group-6.Server --output-dir Data/Migrations
+dotnet ef migrations add <Name> --project CSCN73030-26F-Sec1-ProjectV-Group-6.Server --context CmesDbContext --output-dir Data/Migrations
 ```
 
 ## Integration with other CMES services

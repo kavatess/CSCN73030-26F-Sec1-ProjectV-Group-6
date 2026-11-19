@@ -6,9 +6,6 @@
  * handling and OpenAPI, then builds the request pipeline. Run with `--seed` to apply migrations
  * and load the fictional demo data instead of starting the web server.
  */
-using CSCN73030_26F_Sec1_ProjectV_Group_6.Server.Data;
-using Microsoft.EntityFrameworkCore;
-
 using System.Diagnostics;
 using System.Text.Json;
 using System.Text.Json.Serialization;

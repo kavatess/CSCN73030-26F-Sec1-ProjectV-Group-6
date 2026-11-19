@@ -82,7 +82,7 @@ jobs:
         run: |
           dotnet tool restore
           dotnet publish CSCN73030-26F-Sec1-ProjectV-Group-6.Server -c Release -o publish
-          dotnet ef migrations bundle --project CSCN73030-26F-Sec1-ProjectV-Group-6.Server \
+          dotnet ef migrations bundle --project CSCN73030-26F-Sec1-ProjectV-Group-6.Server --context CmesDbContext \
             --configuration Release --self-contained -r linux-x64 -o efbundle --force
 
       - name: Apply database migrations (and seed the demo data)
