@@ -117,6 +117,7 @@ overwrites existing data.
 | `AADSTS700213` / `AADSTS70021`: no matching federated identity record | The error shows the subject GitHub sent. Re-run `setup-azure.sh` (it registers both the classic `repo:owner/name:…` and the immutable-id `repo:owner@id/name@id:…` forms), or add that exact subject to the identity's federated credentials. The workflow must run in the `production` environment. |
 | Free offer not available for this subscription | Re-run with *sql_free_offer* unticked (Basic tier). |
 | SQL password rejected | It needs 3 of: upper case, lower case, digits, symbols, and at least 8 characters. |
+| `SubscriptionIsOverQuotaForSku` … Current Limit (F1 App Service instances): 0 | The subscription has no free-plan quota in that region (common on student subscriptions). Re-run with *app_service_sku* `B1`, or request an F1 quota of 1 on the portal's Quotas page (Provider: App Service). |
 | Smoke test times out on F1 | The free plan is slow to start; re-run, or choose `B1`. |
 
 ## Configuration reference
