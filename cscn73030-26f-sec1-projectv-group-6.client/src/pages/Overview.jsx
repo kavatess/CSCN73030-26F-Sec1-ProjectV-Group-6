@@ -1,3 +1,7 @@
+/**
+ * @file Overview.jsx
+ * @brief Workforce overview: headcount and payroll by department, items that need attention, recent audit entries, and sending the month's payroll cost to Budget.
+ */
 import { useState } from 'react';
 import { api, daysFromToday, formatCount, formatMoney, humanize, openRequisitionStatuses, timeOfDay, isoDate } from '../api';
 import { useApi } from '../useApi';
@@ -23,6 +27,7 @@ function attentionItems({ expired, expiring, flags, requisitions, headcount }) {
   return items;
 }
 
+/** The workforce overview screen. */
 export default function Overview({ go, notify }) {
   const [search, setSearch] = useState('');
   const headcount = useApi(() => api.departmentHeadcount(), []);

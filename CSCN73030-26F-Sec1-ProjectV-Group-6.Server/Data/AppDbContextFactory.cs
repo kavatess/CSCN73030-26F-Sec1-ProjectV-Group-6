@@ -1,4 +1,11 @@
-﻿using Microsoft.EntityFrameworkCore;
+﻿/**
+ * @file AppDbContextFactory.cs
+ * @brief Design-time factory for the HR-02 draft AppDbContext.
+ *
+ * Part of the HR-02 schema draft (PR #3). Not registered in Program.cs and not used at runtime: the service uses CmesDbContext and the Domain entities. Its own migration lives in Migrations/; every dotnet ef command names --context CmesDbContext.
+ */
+
+using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Design;
 using Microsoft.Extensions.Configuration;
 

@@ -1,3 +1,7 @@
+/**
+ * @file Roster.jsx
+ * @brief Duty roster: a service's week from GET /rosters, coverage against a planning target, and adding shifts after an eligibility check.
+ */
 import { useState } from 'react';
 import { api, humanize, localDate, sortName, timeOfDay } from '../api';
 import { useApi } from '../useApi';
@@ -21,6 +25,7 @@ const addDays = (date, n) => new Date(date.getFullYear(), date.getMonth(), date.
 const dayLabel = (d, opts) => d.toLocaleDateString('en-CA', opts);
 const hours = (e) => (new Date(e.shiftEnd) - new Date(e.shiftStart)) / 3600000;
 
+/** Adds one shift after checking the employee's duty eligibility for the service. */
 function ShiftDialog({ service, staff, initial, close, done, notify }) {
   const [form, setForm] = useState(initial);
   const [problem, setProblem] = useState(null), [busy, setBusy] = useState(false);
@@ -50,6 +55,7 @@ function ShiftDialog({ service, staff, initial, close, done, notify }) {
   </Dialog>;
 }
 
+/** The duty roster screen. */
 export default function Roster({ go, notify }) {
   const [week, setWeek] = useState(0), [department, setDepartment] = useState('EMS'), [serviceId, setServiceId] = useState('1'), [adding, setAdding] = useState(null), [busy, setBusy] = useState(false);
   const from = weekStart(week), to = addDays(from, 7);

@@ -25,6 +25,8 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.Infrastructure;
 using Microsoft.EntityFrameworkCore;
 
+/// @cond PROGRAM_STATEMENTS
+// Doxygen would list each top-level statement below as a function; the @file comment above describes them.
 var builder = WebApplication.CreateBuilder(args);
 
 // ---- Cloud configuration and telemetry (both off unless configured) -------------------------
@@ -184,6 +186,8 @@ app.MapControllers();
 app.MapFallbackToFile("/index.html");
 
 app.Run();
+
+/// @endcond
 
 /// <summary>
 /// Exposes the entry point so the test project can boot the app with <c>WebApplicationFactory&lt;Program&gt;</c>.

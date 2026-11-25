@@ -1,8 +1,8 @@
 # Backend features and structure {#backend}
 
 The Staff/HR backend serves the seven HR screens (Workforce overview, Staff directory, Employee profile,
-Onboard employee, Duty roster, Requisitions, Credentials) and the other CMES services through 33 REST endpoints,
-Azure Service Bus events and a 12-table SQL Server database. Request and response shapes are in `API.md`;
+Onboard employee, Duty roster, Requisitions, Credentials) and the other CMES services through 38 REST endpoints,
+Azure Service Bus events and a 13-table SQL Server database, and it calls Budget and Treasury's Finance API. Request and response shapes are in `API.md`;
 deployment is in @ref deployment "Deploying to Azure".
 
 ## Layers
@@ -39,6 +39,7 @@ handling. 401 and 403 from the authorization layer use the same format.
 | Duty eligibility | `GET /staff/{staffNumber}/eligibility` | Emergency Services, Security, Transport |
 | Security flags | `PUT /staff/{staffNumber}/security-flags/{flagType}`, `GET /staff/{staffNumber}/security-flags`, `GET /security-flags` | Security service |
 | Payroll | `PUT /staff/{staffNumber}/compensation`, `GET /staff/{staffNumber}/compensation`, `GET /headcounts/payroll` | Payroll officers, Budget service |
+| Budget integration | `POST /requisitions/{number}/funding-request`, `POST /requisitions/{number}/funding-request/sync`, `GET /departments/{code}/budget`, `POST`/`GET /headcounts/payroll/statements` | Requisitions, Workforce overview |
 | Audit | `GET /audit` | HR, auditors |
 | Events | `Staff.Onboarded`, `Staff.Terminated` on the Service Bus topic `staff-events` | Every peer service |
 
@@ -96,8 +97,27 @@ first to the Service Bus topic `staff-events` (@ref CSCN73030_26F_Sec1_ProjectV_
 `MessageId`, so retried events are removed as duplicates. Without Service Bus configured, events are written to the
 log. `/health` reports `outbox: Degraded` when an event waits more than 5 minutes.
 
+## Budget and Treasury integration
+
+Staff/HR calls Budget's Finance API through @ref CSCN73030_26F_Sec1_ProjectV_Group_6::Server::Infrastructure::Budget::BudgetClient "BudgetClient", a typed
+`HttpClient` configured by @ref CSCN73030_26F_Sec1_ProjectV_Group_6::Server::Infrastructure::Budget::BudgetOptions "BudgetOptions" (section `Budget`: base URL,
+timeout, background sync, department code map `PTR→TRANSIT`, `MNT→UTIL`, `BUD→FIN`, `HRS→HR`). Budget failures become
+502 (@ref CSCN73030_26F_Sec1_ProjectV_Group_6::Server::Application::Errors::BudgetServiceException "BudgetServiceException"); an empty base URL turns the
+integration off with 503 (@ref CSCN73030_26F_Sec1_ProjectV_Group_6::Server::Application::Errors::BudgetNotConfiguredException "BudgetNotConfiguredException").
+
+| Contract | What happens | Code |
+| --- | --- | --- |
+| HR-C16 funding request | HR sends a hire in HRReview: a funding request for positions × annual cost (given, or estimated from current salaries) is created in Budget and the requisition moves to AwaitingBudget | @ref CSCN73030_26F_Sec1_ProjectV_Group_6::Server::Application::Services::BudgetFundingService::RequestAsync "BudgetFundingService::RequestAsync" |
+| HR-C17 funding decision | Budget decides in its own system; Staff/HR reads the decision back on demand and every 5 minutes, moving the requisition to Approved or Rejected | @ref CSCN73030_26F_Sec1_ProjectV_Group_6::Server::Application::Services::BudgetFundingService::SyncAsync "SyncAsync", @ref CSCN73030_26F_Sec1_ProjectV_Group_6::Server::Infrastructure::Budget::BudgetSyncService "BudgetSyncService" |
+| HR-C18 department budget | Allocated, spent and remaining budget of a department, read live | @ref CSCN73030_26F_Sec1_ProjectV_Group_6::Server::Application::Services::BudgetLedgerService::DepartmentBudgetAsync "BudgetLedgerService::DepartmentBudgetAsync" |
+| HR-C20 payroll cost | Each department's monthly salary cost recorded as a Budget expense, once per month | @ref CSCN73030_26F_Sec1_ProjectV_Group_6::Server::Application::Services::BudgetLedgerService::SendStatementsAsync "BudgetLedgerService::SendStatementsAsync" |
+
 ## Database
 
-Two migrations: `InitialCreate` (all 12 tables, two number sequences, check constraints) and
-`SecurityFlagPerType` (one flag per type per person). Enums are stored as strings and every DateTime is UTC.
+Four migrations: `InitialCreate` (12 tables, two number sequences, check constraints), `SecurityFlagPerType` (one
+flag per type per person), `BudgetFundingRequest` (funding columns on Requisition) and `PayrollStatements` (one
+statement per department and month). Enums are stored as strings and every DateTime is UTC.
 The seeder loads fictional demo data, including pay rates and security flags.
+
+The repository also holds the HR-02 schema draft from an earlier sprint (`Data/AppDbContext.cs`, `Data/Entities/`,
+`Migrations/`). It is not registered in `Program.cs`; every `dotnet ef` command names `--context CmesDbContext`.

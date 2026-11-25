@@ -1,3 +1,7 @@
+/**
+ * @file Onboard.jsx
+ * @brief Onboard employee: POST /staff with the initial assignment, then credentials, pay band and filling the chosen hire requisition.
+ */
 import { useState } from 'react';
 import { api, employmentTypes, employmentTypeLabel, localDate } from '../api';
 import { useApi } from '../useApi';
@@ -15,6 +19,7 @@ function loadDraft() {
 /** Maps API field names (incl. "initialAssignment.serviceId") to the form's keys. */
 const fieldFor = { firstName:'first', lastName:'last', preferredName:'known', dateOfBirth:'dob', email:'email', phone:'phone', citizenId:'citizen', homeDepartmentCode:'department', employmentType:'employment', employmentStatus:'status', hireDate:'hire', 'initialAssignment.serviceId':'service', 'initialAssignment.roleTitle':'role', 'initialAssignment.startDate':'assignment' };
 
+/** The onboarding form. */
 export default function Onboard({ go, notify }) {
   const draft = loadDraft();
   const [form, setForm] = useState(draft?.form ?? blankForm);

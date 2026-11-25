@@ -1,3 +1,7 @@
+/**
+ * @file Requisitions.jsx
+ * @brief Requisitions: the hire and termination workflow, sending hires to Budget and Treasury for funding, Budget's decision, and the department's budget.
+ */
 import { useState } from 'react';
 import { api, daysFromToday, formatMoney, humanize, isoDate, newIdempotencyKey, openRequisitionStatuses, requisitionStatuses, requisitionStatusLabel, timeOfDay } from '../api';
 import { useApi } from '../useApi';
@@ -36,6 +40,7 @@ function actions(r) {
   }
 }
 
+/** Raises a hire or termination requisition with one Idempotency-Key per dialog. */
 function RaiseDialog({ departments, close, done, notify }) {
   const [form, setForm] = useState({ type: 'Hire', departmentCode: departments[0]?.code ?? '', roleTitle: '', positions: 1, reasonCode: 'VACANCY', staffNumber: '' });
   // One key per dialog: retrying after a network error can't create a duplicate requisition.
@@ -98,6 +103,7 @@ function FundingDialog({ requisition, close, done, notify }) {
   </Dialog>;
 }
 
+/** The requisitions screen; `filter.selected` opens a requisition. */
 export default function Requisitions({ go, notify, filter = {} }) {
   const [type, setType] = useState(''), [status, setStatus] = useState('open'), [dept, setDept] = useState(''), [selected, setSelected] = useState(filter.selected || ''), [raising, setRaising] = useState(false), [busy, setBusy] = useState(false), [funding, setFunding] = useState(null);
   const departments = useApi(() => api.departments(), []);
