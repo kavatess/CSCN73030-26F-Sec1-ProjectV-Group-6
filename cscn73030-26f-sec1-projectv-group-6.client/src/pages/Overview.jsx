@@ -45,6 +45,22 @@ export default function Overview({ go, notify }) {
   const maxActive = Math.max(1, ...departments.map((d) => d.active));
   const attention = attentionItems({ expired: expired.data?.items ?? [], expiring: expiringRows, flags: flags.data ?? [], requisitions: requisitions.data ?? [], headcount: departments });
 
+  // Payroll role only: this month's salary cost per department, recorded by Budget as an expense (sent once).
+  const [sending, setSending] = useState(false);
+  const sendPayroll = async () => {
+    if (!window.confirm('Send this month\u2019s salary cost of each department to Budget and Treasury as an expense? Departments Budget already accepted this month are skipped.')) return;
+    setSending(true);
+    try {
+      const result = await api.sendPayrollStatements();
+      const refused = result.statements.filter((s) => !s.accepted);
+      notify(`Payroll ${result.period} sent to Budget: ${formatMoney(result.totalAmount)} across ${result.statements.length} departments` +
+        (refused.length ? `; refused for ${refused.map((s) => s.departmentCode).join(', ')} (${refused[0].message ?? 'no reason given'}).` : '.'));
+    } catch (error) {
+      notify(error.message);
+    }
+    setSending(false);
+  };
+
   const exportCsv = () => {
     csvDownload('cmes-headcount.csv', ['Department', 'Code', 'Active', 'On duty', 'Vacancies', 'Annual payroll'],
       departments.map((d) => [d.name, d.code, d.active, d.onDuty, d.vacancies, payrollByCode[d.code]?.totalAnnualSalary ?? '']));
@@ -62,7 +78,7 @@ export default function Overview({ go, notify }) {
         <Stat label="Credentials expiring ≤ 30d" value={expiring.data ? expiringRows.length : '…'} note={<Pill kind={blocking ? 'bad' : 'ok'}>{blocking} block duty eligibility</Pill>}/>
       </div>
       <div className="split">
-        <Panel title="Headcount by department" action={<Button small disabled={!departments.length} onClick={exportCsv}>Export CSV</Button>} footer={<><span className="tiny">{departments.length} departments · {formatCount(sum('active'))} active · {sum('vacancies')} vacancies</span><span className="tiny mono">{payroll.data ? 'Total ' + formatMoney(payroll.data.totalAnnualSalary) + ' / year' : ''}</span></>}>
+        <Panel title="Headcount by department" action={<div className="row">{payroll.data&&<Button small disabled={sending} onClick={sendPayroll}>{sending?'Sending…':'Send payroll to Budget'}</Button>}<Button small disabled={!departments.length} onClick={exportCsv}>Export CSV</Button></div>} footer={<><span className="tiny">{departments.length} departments · {formatCount(sum('active'))} active · {sum('vacancies')} vacancies</span><span className="tiny mono">{payroll.data ? 'Total ' + formatMoney(payroll.data.totalAnnualSalary) + ' / year' : ''}</span></>}>
           <div className="card-body" style={{padding:'7px 14px'}}><span className="small muted">Live counts served to peer services on <span className="mono">GET /departments/headcount</span> · payroll totals on <span className="mono">GET /headcounts/payroll</span></span></div>
           <div className="table-wrap"><table className="tbl"><thead><tr><th>Department</th><th>Code</th><th>Active</th><th>On duty</th><th>Vacancies</th><th className="right">Annual payroll → Budget</th></tr></thead><tbody>{departments.map(d=><tr key={d.code}><td><button className="link" onClick={()=>go('directory',{department:d.code})}>{d.name}</button></td><td className="mono">{d.code}</td><td><div className="row nowrap"><span className="mono" style={{minWidth:38}}>{d.active}</span><div className="bar" style={{width:138}}><span style={{width:Math.max(3,d.active/maxActive*100)+'%'}}/></div></div></td><td className="mono">{d.onDuty}</td><td className="mono">{d.vacancies}</td><td className="right mono">{payrollCell(d.code)}</td></tr>)}</tbody></table>{!departments.length&&<Empty loading={headcount.loading}>No departments yet. Seed the database (see README).</Empty>}</div>
         </Panel>

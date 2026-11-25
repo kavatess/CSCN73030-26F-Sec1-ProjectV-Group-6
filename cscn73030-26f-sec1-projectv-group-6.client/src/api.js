@@ -97,6 +97,10 @@ export const api = {
   raiseRequisition: (body, idempotencyKey = newIdempotencyKey()) =>
     post('/requisitions', body, { 'Idempotency-Key': idempotencyKey }),
   updateRequisition: (number, body) => patch(`/requisitions/${seg(number)}`, body),
+  // Budget and Treasury: funding for hires (Budget decides in its own system; we read the decision back)
+  requestFunding: (number, body = {}) => post(`/requisitions/${seg(number)}/funding-request`, body),
+  syncFunding: (number) => post(`/requisitions/${seg(number)}/funding-request/sync`, {}),
+  departmentBudget: (code) => get(`/departments/${seg(code)}/budget`),
 
   // Credentials
   credentials: (query) => get('/credentials', query),
@@ -115,6 +119,8 @@ export const api = {
   compensation: (staffNumber) => get(`/staff/${seg(staffNumber)}/compensation`),
   setCompensation: (staffNumber, body) => put(`/staff/${seg(staffNumber)}/compensation`, body),
   payrollHeadcount: () => get('/headcounts/payroll'),
+  payrollStatements: (period) => get('/headcounts/payroll/statements', { period }),
+  sendPayrollStatements: (period) => post('/headcounts/payroll/statements', period ? { period } : {}),
 
   // Audit and health
   audit: (query) => get('/audit', query),

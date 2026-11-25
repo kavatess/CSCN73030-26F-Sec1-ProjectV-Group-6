@@ -120,6 +120,7 @@ function defaultRoutes() {
     'GET /departments/headcount': headcount,
     'GET /departments/:code/services': ({ params }) => services[params[0]] ?? [],
     'GET /headcounts/payroll': payroll,
+    'GET /departments/:code/budget': ({ params }) => ({ code: params[0], name: dept(params[0]).name, budgetDepartmentCode: params[0], allocated: 4500000, spent: 500000, remaining: 4000000, lowBudget: false }),
     'GET /staff': ({ query }) => page(staff.filter((s) =>
       (!query.department || s.homeDepartment.code === query.department) &&
       (!query.status || s.employmentStatus === query.status) &&
