@@ -131,6 +131,7 @@ overwrites existing data.
 | `APPLICATIONINSIGHTS_CONNECTION_STRING` | Bicep | OpenTelemetry export to Application Insights |
 | `Messaging__ServiceBus__FullyQualifiedNamespace` | Bicep | Publish events with the managed identity (only when `enableServiceBus` is true) |
 | `Authentication__EntraId__TenantId` / `Audience` / `ClientId` | Bicep | Token validation |
+| `Budget__BaseUrl` | appsettings.json (override in App Service if Budget moves) | Budget and Treasury's Finance API. The web app calls it over the internet; no firewall change is needed. |
 
 ## Checking a deployment
 
