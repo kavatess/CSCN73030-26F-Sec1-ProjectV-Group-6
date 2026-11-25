@@ -6,6 +6,7 @@
 using CSCN73030_26F_Sec1_ProjectV_Group_6.Server.Application.Events;
 using CSCN73030_26F_Sec1_ProjectV_Group_6.Server.Data;
 using CSCN73030_26F_Sec1_ProjectV_Group_6.Server.Data.Seeding;
+using CSCN73030_26F_Sec1_ProjectV_Group_6.Server.Infrastructure.Budget;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.Data.SqlClient;
@@ -46,6 +47,9 @@ namespace CSCN73030_26F_Sec1_ProjectV_Group_6.Server.Tests.Api
 
         /// <summary>The fake clock injected in place of <see cref="TimeProvider.System"/>.</summary>
         public FakeTimeProvider Time { get; } = new(Now);
+
+        /// <summary>The fake Budget (Finance) API every Budget call goes to.</summary>
+        public FakeBudgetApi Budget { get; } = new();
 
         /// <summary>Creates the database, applies the migration and seeds the demo data.</summary>
         public async Task InitializeAsync()
@@ -89,12 +93,18 @@ namespace CSCN73030_26F_Sec1_ProjectV_Group_6.Server.Tests.Api
             builder.UseSetting("ConnectionStrings:StaffHr", _connectionString);
             // Tests run the outbox dispatcher themselves, so the background loop stays off.
             builder.UseSetting("Messaging:BackgroundPublishing", "false");
+            // Budget calls go to an in-memory fake; tests run the decision sync themselves.
+            builder.UseSetting("Budget:BaseUrl", FakeBudgetApi.BaseUrl);
+            builder.UseSetting("Budget:BackgroundSync", "false");
             builder.ConfigureServices(services =>
             {
                 services.RemoveAll<TimeProvider>();
                 services.AddSingleton<TimeProvider>(Time);
                 services.RemoveAll<IEventPublisher>();
                 services.AddSingleton<IEventPublisher>(Events);
+                services.AddHttpClient<BudgetClient>()
+                    .ConfigurePrimaryHttpMessageHandler(() => Budget)
+                    .SetHandlerLifetime(Timeout.InfiniteTimeSpan);
             });
         }
     }

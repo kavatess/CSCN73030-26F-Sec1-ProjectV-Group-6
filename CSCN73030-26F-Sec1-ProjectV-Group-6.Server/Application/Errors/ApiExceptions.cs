@@ -96,3 +96,24 @@ public class ValidationFailedException : ApiException
     /// <summary>Field name to its messages; becomes the ProblemDetails 'errors' member.</summary>
     public IDictionary<string, string[]> Errors { get; }
 }
+
+/// <summary>The Budget service failed or could not be reached (502).</summary>
+public class BudgetServiceException : ApiException
+{
+    /// <summary>Creates the exception with a message for the caller.</summary>
+    public BudgetServiceException(string detail)
+        : base(StatusCodes.Status502BadGateway, "Budget service error", detail)
+    {
+    }
+}
+
+/// <summary>The Budget integration is switched off because Budget:BaseUrl is not set (503).</summary>
+public class BudgetNotConfiguredException : ApiException
+{
+    /// <summary>Creates the exception.</summary>
+    public BudgetNotConfiguredException()
+        : base(StatusCodes.Status503ServiceUnavailable, "Budget integration off",
+            "The Budget integration is not configured (set Budget:BaseUrl). Record the funding decision by hand instead.")
+    {
+    }
+}

@@ -18,6 +18,7 @@ using CSCN73030_26F_Sec1_ProjectV_Group_6.Server.Data.Repositories;
 using CSCN73030_26F_Sec1_ProjectV_Group_6.Server.Data.Seeding;
 using CSCN73030_26F_Sec1_ProjectV_Group_6.Server.Infrastructure;
 using CSCN73030_26F_Sec1_ProjectV_Group_6.Server.Infrastructure.Auth;
+using CSCN73030_26F_Sec1_ProjectV_Group_6.Server.Infrastructure.Budget;
 using CSCN73030_26F_Sec1_ProjectV_Group_6.Server.Infrastructure.Messaging;
 using CSCN73030_26F_Sec1_ProjectV_Group_6.Server.Infrastructure.Observability;
 using Microsoft.AspNetCore.Mvc;
@@ -132,6 +133,15 @@ else
     builder.Services.AddSingleton<IEventPublisher, LoggingEventPublisher>();
 builder.Services.AddHostedService<OutboxPublisherService>();
 builder.Services.AddScoped<DatabaseSeeder>();
+
+// ---- Budget & Treasury (Finance API) --------------------------------------------------------
+builder.Services.Configure<BudgetOptions>(builder.Configuration.GetSection(BudgetOptions.Section));
+builder.Services.AddHttpClient<BudgetClient>((services, http) =>
+{
+    var options = services.GetRequiredService<Microsoft.Extensions.Options.IOptions<BudgetOptions>>().Value;
+    if (options.IsConfigured) http.BaseAddress = new Uri(options.BaseUrl!.TrimEnd('/') + "/");
+    http.Timeout = TimeSpan.FromSeconds(Math.Max(5, options.TimeoutSeconds));
+});
 
 var app = builder.Build();
 
