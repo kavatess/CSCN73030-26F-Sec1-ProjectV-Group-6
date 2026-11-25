@@ -55,6 +55,9 @@ public class CmesDbContext : DbContext
     public DbSet<Compensation> Compensations => Set<Compensation>();
     /// <summary>Security flags. Schema only.</summary>
     public DbSet<SecurityFlag> SecurityFlags => Set<SecurityFlag>();
+
+    /// <summary>Monthly salary cost statements sent to Budget.</summary>
+    public DbSet<PayrollStatement> PayrollStatements => Set<PayrollStatement>();
     /// <summary>Audit trail. Schema only.</summary>
     public DbSet<AuditLog> AuditLogs => Set<AuditLog>();
     /// <summary>Integration event outbox. Schema only.</summary>

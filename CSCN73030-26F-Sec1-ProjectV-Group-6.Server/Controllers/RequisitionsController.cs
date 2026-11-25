@@ -21,12 +21,15 @@ namespace CSCN73030_26F_Sec1_ProjectV_Group_6.Server.Controllers;
 public class RequisitionsController : ControllerBase
 {
     private readonly RequisitionService _requisitionService;
+    private readonly BudgetFundingService _fundingService;
 
     /// <summary>Creates the RequisitionsController. Dependencies are supplied by dependency injection.</summary>
     /// <param name="requisitionService">Requisition business logic.</param>
-    public RequisitionsController(RequisitionService requisitionService)
+    /// <param name="fundingService">Funding requests through Budget and Treasury.</param>
+    public RequisitionsController(RequisitionService requisitionService, BudgetFundingService fundingService)
     {
         _requisitionService = requisitionService;
+        _fundingService = fundingService;
     }
 
     /// <summary>
@@ -90,4 +93,38 @@ public class RequisitionsController : ControllerBase
     /// <param name="request">New status, budget decision and/or filled count.</param>
     public async Task<ActionResult<RequisitionDto>> Update(string number, UpdateRequisitionRequest request) =>
         await _requisitionService.UpdateAsync(number, request);
+
+    /// <summary>
+    /// Sends a hire requisition in HRReview to Budget and Treasury: creates a funding request in Budget's Finance
+    /// API for the annual cost of all positions and moves the requisition to AwaitingBudget (budgetDecision Pending).
+    /// The cost per position is estimated from current salaries unless annualCostPerPosition is given.
+    /// </summary>
+    /// <param name="number">Requisition number, e.g. REQ-0000005.</param>
+    /// <param name="request">Optional cost per position and urgency.</param>
+    [Authorize(Policy = StaffHrPolicies.Manage)]
+    [HttpPost("{number}/funding-request")]
+    [ProducesResponseType<RequisitionDto>(StatusCodes.Status200OK)]
+    [ProblemResponse(StatusCodes.Status404NotFound, "Requisition 'REQ-0000999' was not found.")]
+    [ProblemResponse(StatusCodes.Status409Conflict, "REQ-0000005 was already sent to Budget (funding request 6f1c…).")]
+    [ProblemResponse(StatusCodes.Status422UnprocessableEntity, "One or more fields are invalid. See 'errors' for details.",
+        ExampleErrors = ["status=Only a requisition in HRReview can be sent to Budget; this one is Received."])]
+    [ProblemResponse(StatusCodes.Status502BadGateway, "The Budget service answered 503: Budget is down for maintenance.")]
+    [ProblemResponse(StatusCodes.Status503ServiceUnavailable,
+        "The Budget integration is not configured (set Budget:BaseUrl). Record the funding decision by hand instead.")]
+    public async Task<ActionResult<RequisitionDto>> RequestFunding(string number, RequestFundingRequest? request) =>
+        await _fundingService.RequestAsync(number, request ?? new RequestFundingRequest(null, null));
+
+    /// <summary>
+    /// Asks Budget now for the decision on this requisition's funding request and applies it: Approved moves the
+    /// requisition to Approved, Rejected to Rejected. A background check does the same every few minutes.
+    /// </summary>
+    /// <param name="number">Requisition number.</param>
+    [Authorize(Policy = StaffHrPolicies.Manage)]
+    [HttpPost("{number}/funding-request/sync")]
+    [ProducesResponseType<RequisitionDto>(StatusCodes.Status200OK)]
+    [ProblemResponse(StatusCodes.Status404NotFound, "Requisition 'REQ-0000999' was not found.")]
+    [ProblemResponse(StatusCodes.Status422UnprocessableEntity, "One or more fields are invalid. See 'errors' for details.",
+        ExampleErrors = ["fundingRequest=REQ-0000005 has not been sent to Budget."])]
+    [ProblemResponse(StatusCodes.Status502BadGateway, "The Budget service could not be reached (HttpRequestException). Try again in a minute.")]
+    public async Task<ActionResult<RequisitionDto>> SyncFunding(string number) => await _fundingService.SyncAsync(number);
 }

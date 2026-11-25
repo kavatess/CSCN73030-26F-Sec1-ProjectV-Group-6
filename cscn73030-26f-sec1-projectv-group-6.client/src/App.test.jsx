@@ -170,6 +170,52 @@ describe('CMES Staff & HR frontend', () => {
     expect((await screen.findAllByText('Patrol Constable')).length).toBeGreaterThan(0);
   });
 
+  it('sends a hire in HR review to Budget for funding', async () => {
+    const inReview = { ...requisitions[0], requisitionNumber:'REQ-0000005', status:'HRReview', budgetDecision:null, positions:2, roleTitle:'Bus Operator', funding:null };
+    server = fakeApi({
+      'GET /requisitions': [inReview],
+      'POST /requisitions/:n/funding-request': ({ body }) => ({ ...inReview, status:'AwaitingBudget', budgetDecision:'Pending',
+        funding:{ requestId:'6f1c0000-0000-0000-0000-000000000001', amount:body.annualCostPerPosition * 2, urgent:body.urgent, requestedAtUtc:'2026-11-05T12:00:00Z', decidedAtUtc:null, lastCheckedAtUtc:'2026-11-05T12:00:00Z' } }),
+    });
+    window.location.hash = '#requisitions';
+    render(<App />);
+    expect(await screen.findByText('$4,000,000')).toBeTruthy();
+    fireEvent.click(await screen.findByRole('button', { name:'Send to Budget' }));
+    const dialog = screen.getByRole('form', { name:'Send to Budget · REQ-0000005' });
+    fireEvent.change(within(dialog).getByLabelText('Annual cost per position'), { target:{ value:'60000' } });
+    fireEvent.click(within(dialog).getByLabelText('Urgent'));
+    fireEvent.click(within(dialog).getByRole('button', { name:'Send funding request' }));
+    expect(await screen.findByText('REQ-0000005 sent to Budget: $120,000 a year.')).toBeTruthy();
+    expect(server.calls.find(c => c.method === 'POST')).toMatchObject({ path:'/requisitions/REQ-0000005/funding-request', body:{ annualCostPerPosition:60000, urgent:true } });
+    expect(server.calls).toContainEqual(expect.objectContaining({ path:'/departments/PTR/budget' }));
+  });
+
+  it('asks Budget for its decision on a requisition it is funding', async () => {
+    const waiting = { ...requisitions[0], funding:{ requestId:'6f1c0000-0000-0000-0000-000000000002', amount:256000, urgent:false, requestedAtUtc:'2026-11-01T12:00:00Z', decidedAtUtc:null, lastCheckedAtUtc:'2026-11-05T11:55:00Z' } };
+    server = fakeApi({
+      'GET /requisitions': [waiting],
+      'POST /requisitions/:n/funding-request/sync': () => ({ ...waiting, status:'Approved', budgetDecision:'Approved' }),
+    });
+    window.location.hash = '#requisitions';
+    render(<App />);
+    expect(await screen.findByText('$256,000 / year')).toBeTruthy();
+    expect(screen.queryByRole('button', { name:'Budget approved' })).toBeNull();
+    fireEvent.click(screen.getByRole('button', { name:'Check Budget now' }));
+    expect(await screen.findByText('Budget decided: REQ-0000004 is now Approved.')).toBeTruthy();
+    expect(server.calls.filter(c => c.method === 'POST').map(c => c.path)).toEqual(['/requisitions/REQ-0000004/funding-request/sync']);
+  });
+
+  it('sends this month\'s payroll cost to Budget from the overview', async () => {
+    server = fakeApi({ 'POST /headcounts/payroll/statements': { period:'2026-11', asOf:'2026-11-05', totalAmount:106250, statements:[
+      { period:'2026-11', departmentCode:'EMS', budgetDepartmentCode:'EMS', headcount:7, amount:43750, accepted:true, message:'Expense recorded' },
+      { period:'2026-11', departmentCode:'BUD', budgetDepartmentCode:'FIN', headcount:1, amount:6250, accepted:false, message:'Insufficient budget' }] } });
+    vi.spyOn(window, 'confirm').mockReturnValue(true);
+    render(<App />);
+    fireEvent.click(await screen.findByRole('button', { name:'Send payroll to Budget' }));
+    expect(await screen.findByText(/Payroll 2026-11 sent to Budget: \$106,250 across 2 departments; refused for BUD \(Insufficient budget\)/)).toBeTruthy();
+    expect(server.calls).toContainEqual(expect.objectContaining({ method:'POST', path:'/headcounts/payroll/statements' }));
+  });
+
   it('raises a hire requisition and reuses its idempotency key on retry', async () => {
     let attempts = 0;
     server = fakeApi({ 'POST /requisitions': ({ body }) => (++attempts === 1 ? problem(503, 'Service unavailable') : reply(201, { ...body, requisitionNumber:'REQ-0000007', status:'Received', department:{ code:'EMS', name:'Emergency Services' }, positionsFilled:0, createdAtUtc:'2026-11-05T12:00:00Z' })) });

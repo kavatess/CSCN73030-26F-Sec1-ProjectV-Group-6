@@ -1,3 +1,7 @@
+/**
+ * @file App.jsx
+ * @brief Application shell: sidebar with live badges and API status, hash routing (\#overview, \#profile/STF-0000002, ...) and toasts.
+ */
 import { useEffect, useState } from 'react';
 import Overview from './pages/Overview';
 import Directory from './pages/Directory';
@@ -15,6 +19,7 @@ const menu = [['overview','Overview'],['directory','Staff directory'],['roster',
 const pages=['overview','directory','roster','requisitions','credentials','profile','onboard'];
 /** "#profile/STF-0000002" → { page:'profile', id:'STF-0000002' }. Unknown hashes open the overview. */
 const parseHash=(hash)=>{const [name,id='']=hash.replace(/^#/,'').split('/');return pages.includes(name)?{page:name,id:decodeURIComponent(id)}:{page:'overview',id:''};};
+/** The application shell and router. */
 export default function App() {
   const [hash,setHash]=useState(()=>location.hash),[context,setContext]=useState({}),[message,setMessage]=useState('');
   const {page,id}=parseHash(hash);

@@ -64,6 +64,25 @@ public class CompensationRepository
                 g.Sum(x => x.Salary ?? 0m)))
             .ToListAsync();
 
+    /// <summary>
+    /// Average current annual salary of active staff in a department, optionally only those currently in a role;
+    /// null when nobody matching has a rate in force.
+    /// </summary>
+    public Task<decimal?> AverageCurrentSalaryAsync(int departmentId, string? roleTitle, DateOnly asOf)
+    {
+        var staff = _db.Staff.Where(s => s.EmploymentStatus != EmploymentStatus.Terminated && s.HomeDepartmentId == departmentId);
+        if (roleTitle != null)
+            staff = staff.Where(s => _db.StaffAssignments.Any(a => a.StaffId == s.StaffId && a.RoleTitle == roleTitle &&
+                                                                    a.StartDate <= asOf && (a.EndDate == null || a.EndDate >= asOf)));
+        return staff
+            .Select(s => _db.Compensations
+                .Where(c => c.StaffId == s.StaffId && c.EffectiveFrom <= asOf && (c.EffectiveTo == null || c.EffectiveTo > asOf))
+                .Select(c => (decimal?)c.AnnualSalary)
+                .FirstOrDefault())
+            .Where(salary => salary != null)
+            .AverageAsync();
+    }
+
     /// <summary>Adds a new rate to be inserted on the next save.</summary>
     /// <param name="compensation">The new rate.</param>
     public void Add(Compensation compensation) => _db.Compensations.Add(compensation);

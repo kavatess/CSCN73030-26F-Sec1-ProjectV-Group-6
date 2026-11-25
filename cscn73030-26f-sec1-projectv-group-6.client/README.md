@@ -41,12 +41,12 @@ login is needed. The sidebar shows whether the API and its database are reachabl
 
 | Screen | Reads | Writes |
 | --- | --- | --- |
-| Overview | `GET /departments/headcount`, `/headcounts/payroll`, `/requisitions`, `/credentials/expiring`, `/credentials?state=Expired`, `/security-flags`, `/audit` | — |
+| Overview | `GET /departments/headcount`, `/headcounts/payroll`, `/requisitions`, `/credentials/expiring`, `/credentials?state=Expired`, `/security-flags`, `/audit` | `POST /headcounts/payroll/statements` (Send payroll to Budget, Payroll role) |
 | Staff directory | `GET /staff` (search, filters, paging), `/departments`, `/departments/{code}/services`, `/rosters/on-duty` | — |
 | Employee profile (`#profile/STF-…`) | `GET /staff/{n}`, `/eligibility`, `/security-flags`, `/compensation`, `/rosters`, `/audit` | `PATCH /staff/{n}`, `POST /staff/{n}/assignments`, `PATCH /assignments/{id}`, `POST /staff/{n}/credentials`, `POST /requisitions` (termination) |
 | Onboard employee | `GET /departments`, services, `/credentials/types`, `/requisitions?type=Hire` | `POST /staff`, `POST /staff/{n}/credentials`, `PUT /staff/{n}/compensation`, `PATCH /requisitions/{number}` |
 | Duty roster | `GET /rosters`, `/staff?service=`, `/staff/{n}/eligibility?service=` | `POST /rosters/entries` (after an eligibility check), `DELETE /rosters/entries/{id}` |
-| Requisitions | `GET /requisitions` | `POST /requisitions` (with `Idempotency-Key`), `PATCH /requisitions/{number}` |
+| Requisitions | `GET /requisitions`, `GET /departments/{code}/budget` | `POST /requisitions` (with `Idempotency-Key`), `PATCH /requisitions/{number}`, `POST /requisitions/{number}/funding-request` (Send to Budget), `.../funding-request/sync` (Check Budget now) |
 | Credentials | `GET /credentials`, `/credentials/types`, `/credentials/expiring` | `PATCH /credentials/{id}` (renew, suspend, reinstate) |
 
 Role-restricted data degrades rather than failing: without the Payroll role the payroll column and the

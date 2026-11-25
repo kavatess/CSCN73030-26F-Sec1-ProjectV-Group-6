@@ -22,6 +22,7 @@ digraph cmes {
     res [label="Residence"];
     bud [label="Budget & Treasury"];
     sec -> hr; emg -> hr; mnt -> hr; trn -> hr; res -> hr; bud -> hr;
+    hr -> bud [label="funding requests,\npayroll expenses", fontsize=9];
 }
 \enddot
 
@@ -58,16 +59,18 @@ The server's layers, folders and business rules are described in @ref backend "B
 During development the server starts the Vite dev server through SpaProxy. The client calls the API
 with a relative URL, so the same code works behind the Vite proxy and when served by ASP.NET.
 
-## Current state
+## Current state (v0.3.0, Sprint 3)
 
-The Staff/HR backend is feature-complete for the brief: staff, departments and services, assignments, duty
-rosters, hire and termination requisitions, credentials, duty eligibility, security-flag sync, payroll for Budget,
-an audit log, `Staff.Onboarded` / `Staff.Terminated` events through a transactional outbox, Entra ID authentication
-with app roles and department-scoped data, telemetry, and Azure deployment. See
-@ref backend "Backend features and structure" and @ref deployment "Deploying to Azure". `README.md` explains how to
-run it locally and `API.md` is the contract for other groups. Every feature has regression tests:
-see @ref REGRESSION_TESTING.md "Regression testing". The template's weather-forecast sample is still present
-because its original tests cover it.
+- **Backend:** staff, departments and services, assignments, duty rosters, hire and termination requisitions,
+  credentials, duty eligibility, security-flag sync, payroll, an audit log, `Staff.Onboarded` / `Staff.Terminated`
+  events through a transactional outbox, Entra ID roles with department-scoped data, telemetry. See
+  @ref backend "Backend features and structure".
+- **Frontend:** the seven HR screens run on the live API. See @ref frontend "Frontend: the HR screens".
+- **Budget and Treasury:** hires are funded through Budget's Finance API, Budget's decisions are read back, department
+  budgets are shown, and monthly payroll cost is recorded in Budget. See the Budget section of @ref backend "Backend features and structure".
+- **Deployment:** Azure App Service and Azure SQL through GitHub Actions. See @ref deployment "Deploying to Azure".
+- **Contract and tools:** `API.md` is the contract for other groups (38 endpoints); `postman/` holds a Postman
+  collection of every request. Every feature has regression tests: see @ref REGRESSION_TESTING.md "Regression testing".
 
 ## Requirements
 

@@ -21,11 +21,11 @@ The parameters in `infra/main.parameters.json` are set for an **Azure for Studen
 | Piece | Setting | Cost |
 | --- | --- | --- |
 | App Service | `F1` (free; 60 CPU minutes a day, sleeps when idle) | Free. Pick `B1` in the workflow (about 13 USD a month) if F1 is too slow. |
-| Azure SQL Database | Free offer: serverless, 100,000 vCore-seconds and 32 GB a month, pauses itself when the allowance runs out | Free. Untick *sql_free_offer* for the Basic tier (about 5 USD a month). |
+| Azure SQL Database | Basic tier by default: always on, 2 GB | About 5 USD a month from the student credit. *sql_free_offer* switches to the free serverless offer (100,000 vCore-seconds a month), but the app queries the database every few seconds while it runs, so the allowance lasts only about 55 running hours a month and the database is then paused until the 1st. |
 | Service Bus | Off (`enableServiceBus: false`): `Staff.Onboarded` / `Staff.Terminated` go to the app log | Free |
 | Key Vault, Application Insights | On | A few cents a month |
 
-The free database pauses after an hour without queries and takes up to a minute to resume, so the first page
+With *sql_free_offer* on, the database pauses after an hour without queries and takes up to a minute to resume, so the first page
 load after a quiet spell is slow. For the same reason the template turns off Always On and the App Service
 health probe when the free offer is used: both would keep the database awake and use up the month's allowance
 in about two days.
@@ -58,18 +58,18 @@ API app registration (step 4 below).
    ```
 
    Use your region from step 1. The script (`infra/setup-azure.sh`) creates resource group
-   `cmes-staffhr-rg`, registers the resource providers, and creates an app registration that GitHub Actions
-   signs in with through a federated credential (no password), with Contributor and User Access Administrator
-   on that resource group only. If the repository is private, upload the file to Cloud Shell instead of `curl`.
-   If your school directory doesn't let students create app registrations, the script fails at step 3/4; ask
-   your instructor to create it, or run the template from Cloud Shell yourself.
+   `cmes-staffhr-rg`, registers the resource providers, and creates the identity GitHub Actions signs in with:
+   a user-assigned managed identity `cmes-staffhr-github-deploy` with a federated credential (no password),
+   given Contributor and User Access Administrator on that resource group only. A managed identity is an
+   Azure resource, so this works even where the school directory doesn't let students create app
+   registrations. Running the script again is safe.
 
 3. **Repository secrets** (GitHub → Settings → Secrets and variables → Actions → New repository secret).
    The script prints the first three:
 
    | Secret | Value |
    | --- | --- |
-   | `AZURE_CLIENT_ID` | Client id of the deployment identity |
+   | `AZURE_CLIENT_ID` | Client id of the deployment managed identity |
    | `AZURE_TENANT_ID` | Tenant id |
    | `AZURE_SUBSCRIPTION_ID` | Subscription id |
    | `SQL_ADMIN_PASSWORD` | A password you make up for the SQL administrator: 12+ characters with upper- and lower-case letters and digits, without `;` `'` `"` |
@@ -93,7 +93,8 @@ merge `production` into `master` first. Then: Actions → **Deploy to Azure** �
 | --- | --- | --- |
 | resource_group | `cmes-staffhr-rg` | Where to deploy |
 | app_service_sku | `F1` | `F1` free, `B1` paid |
-| sql_free_offer | on | Free serverless database; off for Basic |
+| app_location | empty | Region for the web app only, when the resource group's region has no App Service quota |
+| sql_free_offer | off | Basic tier; on for the free serverless offer |
 | demo_mode | on | No sign-in, every role (fictional data only) |
 | seed_demo_data | on | Load the fictional demo data if the database is empty |
 
@@ -114,9 +115,11 @@ overwrites existing data.
 | Error | Fix |
 | --- | --- |
 | `RequestDisallowedByPolicy` / location not allowed | Use a region from step 1 (delete and recreate the resource group there). |
-| `AADSTS70021` / no matching federated identity | The workflow must run in the `production` environment of this exact repository; re-run `setup-azure.sh` with `REPOSITORY=owner/name`. |
+| `AADSTS700213` / `AADSTS70021`: no matching federated identity record | The error shows the subject GitHub sent. Re-run `setup-azure.sh` (it registers both the classic `repo:owner/name:…` and the immutable-id `repo:owner@id/name@id:…` forms), or add that exact subject to the identity's federated credentials. The workflow must run in the `production` environment. |
 | Free offer not available for this subscription | Re-run with *sql_free_offer* unticked (Basic tier). |
+| SQL error 42119 "reached the monthly free amount allowance… paused for the remainder of the month"; every API call answers 500 | The free offer is used up. In the portal open the database → **Compute + storage** → **Continue using database with additional charges** (resumes it at once), then re-run the workflow with *sql_free_offer* unticked to move to Basic. |
 | SQL password rejected | It needs 3 of: upper case, lower case, digits, symbols, and at least 8 characters. |
+| `SubscriptionIsOverQuotaForSku` … Current Limit (F1 or B1 App Service instances): 0 | App Service quota is per region, and student subscriptions often have none in some regions. In Cloud Shell run `bash find-app-region.sh` (from `infra/`): it checks every allowed region without creating anything. Re-run the workflow with *app_location* set to a region it reports OK (the database stays where it is), or request a quota of 1 on the portal's Quotas page (Provider: App Service). |
 | Smoke test times out on F1 | The free plan is slow to start; re-run, or choose `B1`. |
 
 ## Configuration reference
@@ -129,6 +132,7 @@ overwrites existing data.
 | `APPLICATIONINSIGHTS_CONNECTION_STRING` | Bicep | OpenTelemetry export to Application Insights |
 | `Messaging__ServiceBus__FullyQualifiedNamespace` | Bicep | Publish events with the managed identity (only when `enableServiceBus` is true) |
 | `Authentication__EntraId__TenantId` / `Audience` / `ClientId` | Bicep | Token validation |
+| `Budget__BaseUrl` | appsettings.json (override in App Service if Budget moves) | Budget and Treasury's Finance API. The web app calls it over the internet; no firewall change is needed. |
 
 ## Checking a deployment
 

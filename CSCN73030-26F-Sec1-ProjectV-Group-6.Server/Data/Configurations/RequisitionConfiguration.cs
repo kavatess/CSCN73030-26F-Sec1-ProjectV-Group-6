@@ -32,6 +32,8 @@ public class RequisitionConfiguration : IEntityTypeConfiguration<Requisition>
 
         b.Property(r => r.RoleTitle).HasMaxLength(100).IsRequired();
         b.Property(r => r.ReasonCode).HasMaxLength(50);
+        b.Property(r => r.FundingAmount).HasPrecision(18, 2);
+        b.HasIndex(r => r.FundingRequestId);
 
         b.HasOne(r => r.RequestingDepartment)
             .WithMany()

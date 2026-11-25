@@ -1,3 +1,7 @@
+/**
+ * @file Directory.jsx
+ * @brief Staff directory: server-side search, filters and paging over GET /staff, with live status counts and who is on duty now.
+ */
 import { useState } from 'react';
 import { api, credentialStates, employmentStatuses, employmentTypeLabel, formatCount, humanize, sortName } from '../api';
 import { useApi } from '../useApi';
@@ -10,6 +14,7 @@ const blank = { search: '', department: '', service: '', credential: '' };
 /** The query for GET /staff from the applied filters (status chips are added separately). */
 const toQuery = (f) => ({ q: f.search.trim(), department: f.department, service: f.service, credentialState: f.credential });
 
+/** The staff directory screen; `filter` carries a search or department from another screen. */
 export default function Directory({ go, filter, notify }) {
   const initial = { ...blank, search: filter.search || '', department: filter.department || '' };
   const [draft, setDraft] = useState(initial);

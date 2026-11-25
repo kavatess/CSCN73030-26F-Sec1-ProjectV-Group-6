@@ -1,3 +1,7 @@
+/**
+ * @file Credentials.jsx
+ * @brief Credential tracker: licences and certificates by state, renewals and suspensions, and what blocks duty right now.
+ */
 import { useState } from 'react';
 import { api, credentialStates, formatCount, humanize, isoDate, localDate, remainingText } from '../api';
 import { useApi } from '../useApi';
@@ -16,6 +20,7 @@ async function allCredentials() {
   }
 }
 
+/** Records a credential renewal (new number, issue and expiry dates). */
 function RenewDialog({ credential, close, done, notify }) {
   const [form, setForm] = useState({ number: credential.number, issueDate: localDate(), expiryDate: '' });
   const [errors, setErrors] = useState({}), [busy, setBusy] = useState(false);
@@ -40,6 +45,7 @@ function RenewDialog({ credential, close, done, notify }) {
   </Dialog>;
 }
 
+/** The credential tracker; `filter.state` preselects a state chip. */
 export default function Credentials({ go, notify, filter = {} }) {
   const [state, setState] = useState(filter.state || ''), [dept, setDept] = useState(''), [type, setType] = useState(''), [page, setPage] = useState(1), [renewing, setRenewing] = useState(null), [busy, setBusy] = useState(null);
   const departments = useApi(() => api.departments(), []);

@@ -1,4 +1,11 @@
-﻿using CSCN73030_26F_Sec1_ProjectV_Group_6.Server.Data.Entities;
+﻿/**
+ * @file AppDbContext.cs
+ * @brief Draft DbContext for the Staff/HR schema (HR-02).
+ *
+ * Part of the HR-02 schema draft (PR #3). Not registered in Program.cs and not used at runtime: the service uses CmesDbContext and the Domain entities. Its own migration lives in Migrations/; every dotnet ef command names --context CmesDbContext.
+ */
+
+using CSCN73030_26F_Sec1_ProjectV_Group_6.Server.Data.Entities;
 using Microsoft.EntityFrameworkCore;
 
 namespace CSCN73030_26F_Sec1_ProjectV_Group_6.Server.Data;
@@ -6,21 +13,35 @@ namespace CSCN73030_26F_Sec1_ProjectV_Group_6.Server.Data;
 /// <summary>The Staff/HR database: the tables and the rules that go with them.</summary>
 public class AppDbContext : DbContext
 {
+    /// <summary>Creates the context with the given options.</summary>
     public AppDbContext(DbContextOptions<AppDbContext> options) : base(options) { }
 
+    /// <summary>The Department table.</summary>
     public DbSet<Department> Departments => Set<Department>();
+    /// <summary>The Service table.</summary>
     public DbSet<Service> Services => Set<Service>();
+    /// <summary>The Staff table.</summary>
     public DbSet<Staff> StaffMembers => Set<Staff>();
+    /// <summary>The StaffAssignment table.</summary>
     public DbSet<StaffAssignment> StaffAssignments => Set<StaffAssignment>();
+    /// <summary>The RosterEntry table.</summary>
     public DbSet<RosterEntry> RosterEntries => Set<RosterEntry>();
+    /// <summary>The Requisition table.</summary>
     public DbSet<Requisition> Requisitions => Set<Requisition>();
+    /// <summary>The CredentialType table.</summary>
     public DbSet<CredentialType> CredentialTypes => Set<CredentialType>();
+    /// <summary>The Credential table.</summary>
     public DbSet<Credential> Credentials => Set<Credential>();
+    /// <summary>The SecurityFlag table.</summary>
     public DbSet<SecurityFlag> SecurityFlags => Set<SecurityFlag>();
+    /// <summary>The Compensation table.</summary>
     public DbSet<Compensation> Compensations => Set<Compensation>();
+    /// <summary>The AuditLog table.</summary>
     public DbSet<AuditLog> AuditLogs => Set<AuditLog>();
+    /// <summary>The OutboxEvent table.</summary>
     public DbSet<OutboxEvent> OutboxEvents => Set<OutboxEvent>();
 
+    /// <summary>Stores enums as text and money as decimal(12,2).</summary>
     protected override void ConfigureConventions(ModelConfigurationBuilder configurationBuilder)
     {
         // Store enums as readable text ("Active") instead of numbers (0).
@@ -35,6 +56,7 @@ public class AppDbContext : DbContext
         configurationBuilder.Properties<decimal>().HavePrecision(12, 2);
     }
 
+    /// <summary>Keys, sizes, unique indexes and check constraints of the HR-02 tables.</summary>
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         modelBuilder.Entity<Department>(e =>

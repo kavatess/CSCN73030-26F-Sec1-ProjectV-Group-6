@@ -1,3 +1,7 @@
+/**
+ * @file Profile.jsx
+ * @brief Employee profile (\#profile/STF-0000000): identity, postings, credentials, shifts, pay, audit trail, eligibility and security flags, with edit, assign, credential and termination actions.
+ */
 import { Fragment, useState } from 'react';
 import { api, employmentStatuses, employmentTypes, employmentTypeLabel, formatMoney, humanize, isoDate, localDate, remainingText, sortName, timeOfDay } from '../api';
 import { useApi } from '../useApi';
@@ -14,6 +18,7 @@ function serviceYears(hireDate) {
   return months < 0 ? 'Starts ' + hireDate : `${Math.floor(months / 12)} yr ${months % 12} mo`;
 }
 
+/** Credentials of one employee, as a table. */
 function CredentialTable({ rows }) {
   return rows.length?<div className="table-wrap" style={{marginTop:14}}><table className="tbl"><thead><tr><th>Credential</th><th>Number</th><th>Expires</th><th>State</th><th>Duty impact</th></tr></thead><tbody>{rows.map(c=><tr key={c.credentialId}><td>{c.credentialType}</td><td className="mono">{c.number}</td><td className="mono">{isoDate(c.expiryDate)}</td><td><Pill>{c.status==='Expiring'?remainingText(c.daysUntilExpiry):humanize(c.status)}</Pill></td><td>{c.isDutyBlocking?'Required for duty':'Advisory'}</td></tr>)}</tbody></table></div>:<p className="muted small" style={{marginTop:14}}>No credentials on record.</p>;
 }
@@ -77,6 +82,7 @@ function ProfileDialog({ kind, person, close, done, notify }) {
   </Dialog>;
 }
 
+/** One employee's profile, loaded by staff number. */
 export default function Profile({ staffNumber, go, notify }) {
   const [tab, setTab] = useState('Overview'), [modal, setModal] = useState('');
   const person = useApi(() => api.staff(staffNumber), [staffNumber]);

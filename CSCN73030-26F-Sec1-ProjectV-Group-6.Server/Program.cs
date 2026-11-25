@@ -6,9 +6,6 @@
  * handling and OpenAPI, then builds the request pipeline. Run with `--seed` to apply migrations
  * and load the fictional demo data instead of starting the web server.
  */
-using CSCN73030_26F_Sec1_ProjectV_Group_6.Server.Data;
-using Microsoft.EntityFrameworkCore;
-
 using System.Diagnostics;
 using System.Text.Json;
 using System.Text.Json.Serialization;
@@ -21,12 +18,15 @@ using CSCN73030_26F_Sec1_ProjectV_Group_6.Server.Data.Repositories;
 using CSCN73030_26F_Sec1_ProjectV_Group_6.Server.Data.Seeding;
 using CSCN73030_26F_Sec1_ProjectV_Group_6.Server.Infrastructure;
 using CSCN73030_26F_Sec1_ProjectV_Group_6.Server.Infrastructure.Auth;
+using CSCN73030_26F_Sec1_ProjectV_Group_6.Server.Infrastructure.Budget;
 using CSCN73030_26F_Sec1_ProjectV_Group_6.Server.Infrastructure.Messaging;
 using CSCN73030_26F_Sec1_ProjectV_Group_6.Server.Infrastructure.Observability;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.Infrastructure;
 using Microsoft.EntityFrameworkCore;
 
+/// @cond PROGRAM_STATEMENTS
+// Doxygen would list each top-level statement below as a function; the @file comment above describes them.
 var builder = WebApplication.CreateBuilder(args);
 
 // ---- Cloud configuration and telemetry (both off unless configured) -------------------------
@@ -136,6 +136,19 @@ else
 builder.Services.AddHostedService<OutboxPublisherService>();
 builder.Services.AddScoped<DatabaseSeeder>();
 
+// ---- Budget & Treasury (Finance API) --------------------------------------------------------
+builder.Services.Configure<BudgetOptions>(builder.Configuration.GetSection(BudgetOptions.Section));
+builder.Services.AddHttpClient<BudgetClient>((services, http) =>
+{
+    var options = services.GetRequiredService<Microsoft.Extensions.Options.IOptions<BudgetOptions>>().Value;
+    if (options.IsConfigured) http.BaseAddress = new Uri(options.BaseUrl!.TrimEnd('/') + "/");
+    http.Timeout = TimeSpan.FromSeconds(Math.Max(5, options.TimeoutSeconds));
+});
+builder.Services.AddScoped<BudgetFundingService>();
+builder.Services.AddScoped<BudgetLedgerService>();
+builder.Services.AddScoped<PayrollStatementRepository>();
+builder.Services.AddHostedService<BudgetSyncService>();
+
 var app = builder.Build();
 
 // `dotnet run -- --seed`: apply migrations, load demo data, exit.
@@ -173,6 +186,8 @@ app.MapControllers();
 app.MapFallbackToFile("/index.html");
 
 app.Run();
+
+/// @endcond
 
 /// <summary>
 /// Exposes the entry point so the test project can boot the app with <c>WebApplicationFactory&lt;Program&gt;</c>.

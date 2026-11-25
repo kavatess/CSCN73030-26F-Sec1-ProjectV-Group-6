@@ -65,7 +65,7 @@ The password is only for that throwaway local container (see `docker-compose.yml
 ### 3. Migrate
 
 ```bash
-dotnet ef database update --project CSCN73030-26F-Sec1-ProjectV-Group-6.Server
+dotnet ef database update --project CSCN73030-26F-Sec1-ProjectV-Group-6.Server --context CmesDbContext
 ```
 
 This creates the database, all 12 tables and the two number sequences from the single `InitialCreate` migration.
@@ -81,7 +81,7 @@ It does nothing if the database already has departments, so it is safe to run tw
 database and seed again:
 
 ```bash
-dotnet ef database drop --force --project CSCN73030-26F-Sec1-ProjectV-Group-6.Server
+dotnet ef database drop --force --project CSCN73030-26F-Sec1-ProjectV-Group-6.Server --context CmesDbContext
 ```
 
 ### 5. Run
@@ -119,6 +119,9 @@ Everything below is optional locally and set by the Bicep template in Azure (see
 | `Authentication:EntraId:TenantId` / `Audience` / `ClientId` | empty / `api://cmes-staff-hr` / empty | Entra ID app registration |
 | `Messaging:ServiceBus:FullyQualifiedNamespace` or `ConnectionString` | empty (events go to the log) | Publish integration events to the `staff-events` topic |
 | `KeyVault:Uri` | empty | Load secrets (e.g. `ConnectionStrings--StaffHr`) from Azure Key Vault |
+| `Budget:BaseUrl` | Budget's test deployment | Budget and Treasury's Finance API (funding requests, department budgets, payroll expenses). Empty switches the integration off. |
+| `Budget:BackgroundSync` / `SyncIntervalMinutes` | `true` / `5` | Check Budget for funding decisions in the background |
+| `Budget:DepartmentCodes` | `PTR→TRANSIT`, `MNT→UTIL`, `BUD→FIN`, `HRS→HR` | Our department codes → Budget's |
 | `APPLICATIONINSIGHTS_CONNECTION_STRING` | empty | Export traces, metrics and logs to Application Insights |
 
 ## Tests and documentation
@@ -215,7 +218,7 @@ A request flows **Controller → Service → Repository → DbContext**. Service
 ## Adding a migration
 
 ```bash
-dotnet ef migrations add <Name> --project CSCN73030-26F-Sec1-ProjectV-Group-6.Server --output-dir Data/Migrations
+dotnet ef migrations add <Name> --project CSCN73030-26F-Sec1-ProjectV-Group-6.Server --context CmesDbContext --output-dir Data/Migrations
 ```
 
 ## Integration with other CMES services
@@ -224,5 +227,5 @@ dotnet ef migrations add <Name> --project CSCN73030-26F-Sec1-ProjectV-Group-6.Se
 | --- | --- |
 | Emergency Services, Security, Transport | `GET /staff/{staffNumber}/eligibility` before rostering or dispatching; staff and roster reads |
 | Security | `PUT /staff/{staffNumber}/security-flags/{flagType}` to sync flags |
-| Budget & Treasury | `GET /headcounts/payroll` (Payroll role); records budget decisions on requisitions via HR |
+| Budget & Treasury | `GET /headcounts/payroll` (Payroll role). We call Budget's Finance API: funding requests for hire requisitions (decisions read back every 5 minutes), department budgets, and monthly payroll expenses. See API.md, "Funding by Budget and Treasury". |
 | Every department | `POST /requisitions` (hire or termination); subscribe to `Staff.Onboarded` / `Staff.Terminated` |

@@ -1,0 +1,3880 @@
+{
+  "info": {
+    "_postman_id": "700f6730-2b7a-415d-b140-f99582a7b167",
+    "name": "CMES Staff/HR API",
+    "description": "Every Staff/HR endpoint plus the Budget & Treasury Finance API calls the integration uses. Pick an environment (Azure or Local). Requests save the ids they create in collection variables (newStaffNumber, requisitionNumber, fundingRequestId, ...) for the requests after them. In Development (demo mode) no token is needed.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "item": [
+    {
+      "name": "01 Health",
+      "description": "No token needed.",
+      "item": [
+        {
+          "name": "Health",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/health",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "health"
+              ]
+            },
+            "description": "Database and outbox health. 200 Healthy/Degraded, 503 Unhealthy."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 200 or 503', () => pm.expect(pm.response.code).to.be.oneOf([200, 503]));",
+                  "pm.test('Has status', () => pm.expect(pm.response.json()).to.have.property('status'));"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "02 Departments & services",
+      "description": "Department codes: EMS, SEC, PTR, MNT, BUD, RES, HRS.",
+      "item": [
+        {
+          "name": "List departments",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/departments",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "departments"
+              ]
+            },
+            "description": ""
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 200', () => pm.expect(pm.response.code).to.be.oneOf([200]));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Services of a department",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/departments/{{departmentCode}}/services",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "departments",
+                "{{departmentCode}}",
+                "services"
+              ]
+            },
+            "description": "serviceId values for rosters and assignments."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 200', () => pm.expect(pm.response.code).to.be.oneOf([200]));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Headcount per department",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/departments/headcount",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "departments",
+                "headcount"
+              ]
+            },
+            "description": "Active, on duty now, vacancies."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 200', () => pm.expect(pm.response.code).to.be.oneOf([200]));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Department budget (from Budget)",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/departments/{{departmentCode}}/budget",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "departments",
+                "{{departmentCode}}",
+                "budget"
+              ]
+            },
+            "description": "Read live from Budget's Finance API under Budget's code (PTR\u2192TRANSIT, MNT\u2192UTIL, BUD\u2192FIN, HRS\u2192HR)."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 200 or 502 or 503', () => pm.expect(pm.response.code).to.be.oneOf([200, 502, 503]));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Unknown department \u2192 404",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/departments/XYZ/services",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "departments",
+                "XYZ",
+                "services"
+              ]
+            },
+            "description": ""
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 404', () => pm.expect(pm.response.code).to.be.oneOf([404]));"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "03 Staff",
+      "description": "Directory, profile, onboarding. Salary is never in these responses.",
+      "item": [
+        {
+          "name": "Search staff",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/staff?q=&department={{departmentCode}}&page=1&pageSize=20",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "staff"
+              ],
+              "query": [
+                {
+                  "key": "q",
+                  "value": ""
+                },
+                {
+                  "key": "department",
+                  "value": "{{departmentCode}}"
+                },
+                {
+                  "key": "service",
+                  "value": "",
+                  "disabled": true
+                },
+                {
+                  "key": "role",
+                  "value": "",
+                  "disabled": true
+                },
+                {
+                  "key": "status",
+                  "value": "Active",
+                  "disabled": true
+                },
+                {
+                  "key": "credentialState",
+                  "value": "Expiring",
+                  "disabled": true
+                },
+                {
+                  "key": "page",
+                  "value": "1"
+                },
+                {
+                  "key": "pageSize",
+                  "value": "20"
+                }
+              ]
+            },
+            "description": "Search and filters run on the server."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 200', () => pm.expect(pm.response.code).to.be.oneOf([200]));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Get profile",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/staff/{{staffNumber}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "staff",
+                "{{staffNumber}}"
+              ]
+            },
+            "description": "Profile with assignments and credentials."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 200', () => pm.expect(pm.response.code).to.be.oneOf([200]));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Onboard employee (POST /staff)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/staff",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "staff"
+              ]
+            },
+            "description": "Creates an employee; saves newStaffNumber. Publishes Staff.Onboarded.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"firstName\": \"Avery\",\n  \"lastName\": \"Postman\",\n  \"preferredName\": \"Ave\",\n  \"email\": \"postman.{{$guid}}@cmes.example\",\n  \"dateOfBirth\": \"1997-04-12\",\n  \"phone\": \"555-0199\",\n  \"citizenId\": \"CIT-FAKE-000123\",\n  \"hireDate\": \"{{today}}\",\n  \"employmentType\": \"FullTime\",\n  \"employmentStatus\": \"Probation\",\n  \"homeDepartmentCode\": \"EMS\",\n  \"initialAssignment\": {\n    \"serviceId\": 1,\n    \"roleTitle\": \"Primary Care Paramedic\"\n  }\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 201', () => pm.expect(pm.response.code).to.be.oneOf([201]));",
+                  "if (pm.response.code < 300) { const j = pm.response.json(); pm.collectionVariables.set('newStaffNumber', j.staffNumber); }",
+                  "pm.test('Has staff number', () => pm.expect(pm.response.json().staffNumber).to.match(/^STF-\\d{7}$/));"
+                ]
+              }
+            },
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.collectionVariables.set('today', new Date().toISOString().slice(0, 10));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Update employee (PATCH)",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/staff/{{newStaffNumber}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "staff",
+                "{{newStaffNumber}}"
+              ]
+            },
+            "description": "Partial update; omitted fields stay.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"phone\": \"555-0142\",\n  \"employmentStatus\": \"Active\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 200', () => pm.expect(pm.response.code).to.be.oneOf([200]));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Duplicate email \u2192 409",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/staff",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "staff"
+              ]
+            },
+            "description": "Work email must be unique city-wide.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"firstName\": \"Avery\",\n  \"lastName\": \"Postman\",\n  \"preferredName\": \"Ave\",\n  \"email\": \"desmond.achterberg@cmes.example\",\n  \"dateOfBirth\": \"1997-04-12\",\n  \"phone\": \"555-0199\",\n  \"citizenId\": \"CIT-FAKE-000123\",\n  \"hireDate\": \"{{today}}\",\n  \"employmentType\": \"FullTime\",\n  \"employmentStatus\": \"Probation\",\n  \"homeDepartmentCode\": \"EMS\",\n  \"initialAssignment\": {\n    \"serviceId\": 1,\n    \"roleTitle\": \"Primary Care Paramedic\"\n  }\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 409', () => pm.expect(pm.response.code).to.be.oneOf([409]));"
+                ]
+              }
+            },
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.collectionVariables.set('today', new Date().toISOString().slice(0, 10));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Missing fields \u2192 422",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/staff",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "staff"
+              ]
+            },
+            "description": "",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"firstName\": \"OnlyAName\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 422', () => pm.expect(pm.response.code).to.be.oneOf([422]));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Unknown staff \u2192 404",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/staff/STF-0999999",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "staff",
+                "STF-0999999"
+              ]
+            },
+            "description": ""
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 404', () => pm.expect(pm.response.code).to.be.oneOf([404]));"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "04 Assignments",
+      "description": "Uses newStaffNumber from 03 Staff \u203a Onboard employee.",
+      "item": [
+        {
+          "name": "Add assignment",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/staff/{{newStaffNumber}}/assignments",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "staff",
+                "{{newStaffNumber}}",
+                "assignments"
+              ]
+            },
+            "description": "Saves assignmentId.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"serviceId\": 3,\n  \"roleTitle\": \"Emergency Dispatcher\",\n  \"startDate\": \"{{today}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 201', () => pm.expect(pm.response.code).to.be.oneOf([201]));",
+                  "if (pm.response.code < 300) { const j = pm.response.json(); pm.collectionVariables.set('assignmentId', j.assignmentId); }"
+                ]
+              }
+            },
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.collectionVariables.set('today', new Date().toISOString().slice(0, 10));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "List assignments",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/staff/{{newStaffNumber}}/assignments",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "staff",
+                "{{newStaffNumber}}",
+                "assignments"
+              ]
+            },
+            "description": ""
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 200', () => pm.expect(pm.response.code).to.be.oneOf([200]));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "End assignment (PATCH)",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/assignments/{{assignmentId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "assignments",
+                "{{assignmentId}}"
+              ]
+            },
+            "description": "Sets the end date (must be after the start date).",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"endDate\": \"{{tomorrow}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 200', () => pm.expect(pm.response.code).to.be.oneOf([200]));"
+                ]
+              }
+            },
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.collectionVariables.set('tomorrow', new Date(Date.now() + 86400000).toISOString().slice(0, 10));"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "05 Rosters",
+      "description": "Shifts are UTC. Overlapping shifts are refused (409).",
+      "item": [
+        {
+          "name": "Roster for a service and week",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/rosters?service={{serviceId}}&from={{fromDate}}&to={{toDate}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "rosters"
+              ],
+              "query": [
+                {
+                  "key": "service",
+                  "value": "{{serviceId}}"
+                },
+                {
+                  "key": "from",
+                  "value": "{{fromDate}}"
+                },
+                {
+                  "key": "to",
+                  "value": "{{toDate}}"
+                }
+              ]
+            },
+            "description": ""
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 200', () => pm.expect(pm.response.code).to.be.oneOf([200]));"
+                ]
+              }
+            },
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const now = new Date(); const from = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()));",
+                  "pm.collectionVariables.set('fromDate', from.toISOString());",
+                  "pm.collectionVariables.set('toDate', new Date(from.getTime() + 7 * 86400000).toISOString());"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Add shift",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/rosters/entries",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "rosters",
+                "entries"
+              ]
+            },
+            "description": "Saves rosterEntryId. Check eligibility first (07 folder).",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"staffNumber\": \"{{staffNumber}}\",\n  \"serviceId\": {{serviceId}},\n  \"shiftStart\": \"{{shiftStart}}\",\n  \"shiftEnd\": \"{{shiftEnd}}\",\n  \"shiftType\": \"Day\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 201 or 409', () => pm.expect(pm.response.code).to.be.oneOf([201, 409]));",
+                  "if (pm.response.code < 300) { const j = pm.response.json(); pm.collectionVariables.set('rosterEntryId', j.rosterEntryId); }"
+                ]
+              }
+            },
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "// Tomorrow 07:00 to 19:00 UTC, plus a random minute offset so reruns don't overlap",
+                  "const d = new Date(); d.setUTCDate(d.getUTCDate() + 1 + Math.floor(Math.random() * 20)); d.setUTCHours(7, 0, 0, 0);",
+                  "pm.collectionVariables.set('shiftStart', d.toISOString());",
+                  "pm.collectionVariables.set('shiftEnd', new Date(d.getTime() + 12 * 3600 * 1000).toISOString());"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Headcount per service",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/rosters/headcount?",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "rosters",
+                "headcount"
+              ],
+              "query": [
+                {
+                  "key": "service",
+                  "value": "{{serviceId}}",
+                  "disabled": true
+                }
+              ]
+            },
+            "description": ""
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 200', () => pm.expect(pm.response.code).to.be.oneOf([200]));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "On duty now",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/rosters/on-duty?",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "rosters",
+                "on-duty"
+              ],
+              "query": [
+                {
+                  "key": "service",
+                  "value": "{{serviceId}}",
+                  "disabled": true
+                },
+                {
+                  "key": "at",
+                  "value": "",
+                  "disabled": true
+                }
+              ]
+            },
+            "description": ""
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 200', () => pm.expect(pm.response.code).to.be.oneOf([200]));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Remove shift",
+          "request": {
+            "method": "DELETE",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/rosters/entries/{{rosterEntryId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "rosters",
+                "entries",
+                "{{rosterEntryId}}"
+              ]
+            },
+            "description": ""
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 204 or 404', () => pm.expect(pm.response.code).to.be.oneOf([204, 404]));"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "06 Requisitions",
+      "description": "Hire: Received \u2192 HRReview \u2192 AwaitingBudget \u2192 Approved \u2192 Filling \u2192 Completed. Termination: Received \u2192 HRReview \u2192 Approved \u2192 Completed.",
+      "item": [
+        {
+          "name": "Raise hire requisition",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Idempotency-Key",
+                "value": "{{$guid}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/requisitions",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "requisitions"
+              ]
+            },
+            "description": "Idempotency-Key is a new GUID each send. Saves requisitionNumber.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"type\": \"Hire\",\n  \"departmentCode\": \"{{departmentCode}}\",\n  \"roleTitle\": \"Primary Care Paramedic\",\n  \"positions\": 2,\n  \"reasonCode\": \"VACANCY\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 201', () => pm.expect(pm.response.code).to.be.oneOf([201]));",
+                  "if (pm.response.code < 300) { const j = pm.response.json(); pm.collectionVariables.set('requisitionNumber', j.requisitionNumber); }"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Replay same key \u2192 200 original",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Idempotency-Key",
+                "value": "postman-fixed-key-1"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/requisitions",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "requisitions"
+              ]
+            },
+            "description": "Sends a fixed key twice: first 201, then 200 with Idempotent-Replayed: true.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"type\": \"Hire\",\n  \"departmentCode\": \"HRS\",\n  \"roleTitle\": \"Recruiter\",\n  \"positions\": 1\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 200 or 201', () => pm.expect(pm.response.code).to.be.oneOf([200, 201]));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Missing Idempotency-Key \u2192 400",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/requisitions",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "requisitions"
+              ]
+            },
+            "description": "",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"departmentCode\": \"HRS\",\n  \"roleTitle\": \"Recruiter\",\n  \"positions\": 1\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 400', () => pm.expect(pm.response.code).to.be.oneOf([400]));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "List requisitions",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/requisitions?",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "requisitions"
+              ],
+              "query": [
+                {
+                  "key": "type",
+                  "value": "Hire",
+                  "disabled": true
+                },
+                {
+                  "key": "status",
+                  "value": "AwaitingBudget",
+                  "disabled": true
+                },
+                {
+                  "key": "department",
+                  "value": "{{departmentCode}}",
+                  "disabled": true
+                }
+              ]
+            },
+            "description": ""
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 200', () => pm.expect(pm.response.code).to.be.oneOf([200]));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Get requisition",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/requisitions/{{requisitionNumber}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "requisitions",
+                "{{requisitionNumber}}"
+              ]
+            },
+            "description": ""
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 200', () => pm.expect(pm.response.code).to.be.oneOf([200]));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Start HR review",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/requisitions/{{requisitionNumber}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "requisitions",
+                "{{requisitionNumber}}"
+              ]
+            },
+            "description": "",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"status\": \"HRReview\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 200', () => pm.expect(pm.response.code).to.be.oneOf([200]));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Record Budget decision by hand (fallback)",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/requisitions/{{requisitionNumber}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "requisitions",
+                "{{requisitionNumber}}"
+              ]
+            },
+            "description": "Only when Budget can't be used. Normally use 08 Budget integration.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"status\": \"AwaitingBudget\",\n  \"budgetDecision\": \"Pending\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 200 or 422', () => pm.expect(pm.response.code).to.be.oneOf([200, 422]));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Invalid move \u2192 422",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/requisitions/{{requisitionNumber}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "requisitions",
+                "{{requisitionNumber}}"
+              ]
+            },
+            "description": "",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"status\": \"Completed\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 422', () => pm.expect(pm.response.code).to.be.oneOf([422]));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Raise termination",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Idempotency-Key",
+                "value": "{{$guid}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/requisitions",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "requisitions"
+              ]
+            },
+            "description": "For newStaffNumber (03 Staff). Saves terminationNumber.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"type\": \"Termination\",\n  \"staffNumber\": \"{{newStaffNumber}}\",\n  \"reasonCode\": \"RESIGNATION\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 201 or 409', () => pm.expect(pm.response.code).to.be.oneOf([201, 409]));",
+                  "if (pm.response.code < 300) { const j = pm.response.json(); pm.collectionVariables.set('terminationNumber', j.requisitionNumber); }"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "07 Credentials, eligibility & security flags",
+      "description": "",
+      "item": [
+        {
+          "name": "List credentials",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/credentials?page=1&pageSize=20",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "credentials"
+              ],
+              "query": [
+                {
+                  "key": "state",
+                  "value": "Expiring",
+                  "disabled": true
+                },
+                {
+                  "key": "type",
+                  "value": "",
+                  "disabled": true
+                },
+                {
+                  "key": "department",
+                  "value": "{{departmentCode}}",
+                  "disabled": true
+                },
+                {
+                  "key": "page",
+                  "value": "1"
+                },
+                {
+                  "key": "pageSize",
+                  "value": "20"
+                }
+              ]
+            },
+            "description": ""
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 200', () => pm.expect(pm.response.code).to.be.oneOf([200]));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Credential types",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/credentials/types",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "credentials",
+                "types"
+              ]
+            },
+            "description": ""
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 200', () => pm.expect(pm.response.code).to.be.oneOf([200]));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Expiring within 30 days",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/credentials/expiring?withinDays=30",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "credentials",
+                "expiring"
+              ],
+              "query": [
+                {
+                  "key": "withinDays",
+                  "value": "30"
+                }
+              ]
+            },
+            "description": ""
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 200', () => pm.expect(pm.response.code).to.be.oneOf([200]));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Add credential",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/staff/{{newStaffNumber}}/credentials",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "staff",
+                "{{newStaffNumber}}",
+                "credentials"
+              ]
+            },
+            "description": "Saves credentialId.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"credentialTypeId\": 3,\n  \"number\": \"PM-{{$randomInt}}\",\n  \"issueDate\": \"2026-01-10\",\n  \"expiryDate\": \"2028-01-10\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 201', () => pm.expect(pm.response.code).to.be.oneOf([201]));",
+                  "if (pm.response.code < 300) { const j = pm.response.json(); pm.collectionVariables.set('credentialId', j.credentialId); }"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Renew credential",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/credentials/{{credentialId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "credentials",
+                "{{credentialId}}"
+              ]
+            },
+            "description": "",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"number\": \"PM-RENEWED\",\n  \"issueDate\": \"{{today}}\",\n  \"expiryDate\": \"2029-12-31\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 200', () => pm.expect(pm.response.code).to.be.oneOf([200]));"
+                ]
+              }
+            },
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.collectionVariables.set('today', new Date().toISOString().slice(0, 10));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Suspend credential",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/credentials/{{credentialId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "credentials",
+                "{{credentialId}}"
+              ]
+            },
+            "description": "",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"suspended\": true\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 200', () => pm.expect(pm.response.code).to.be.oneOf([200]));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Duty eligibility",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/staff/{{staffNumber}}/eligibility?",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "staff",
+                "{{staffNumber}}",
+                "eligibility"
+              ],
+              "query": [
+                {
+                  "key": "service",
+                  "value": "{{serviceId}}",
+                  "disabled": true
+                },
+                {
+                  "key": "at",
+                  "value": "",
+                  "disabled": true
+                }
+              ]
+            },
+            "description": "eligible, reasons and warnings."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 200', () => pm.expect(pm.response.code).to.be.oneOf([200]));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Sync security flag (Security service)",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/staff/{{newStaffNumber}}/security-flags/BackgroundCheck",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "staff",
+                "{{newStaffNumber}}",
+                "security-flags",
+                "BackgroundCheck"
+              ]
+            },
+            "description": "An Active flag makes the person ineligible. Older updatedAt is ignored.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"status\": \"Active\",\n  \"updatedAt\": \"{{$isoTimestamp}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 200 or 201', () => pm.expect(pm.response.code).to.be.oneOf([200, 201]));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Clear security flag",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/staff/{{newStaffNumber}}/security-flags/BackgroundCheck",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "staff",
+                "{{newStaffNumber}}",
+                "security-flags",
+                "BackgroundCheck"
+              ]
+            },
+            "description": "",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"status\": \"Cleared\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 200', () => pm.expect(pm.response.code).to.be.oneOf([200]));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Flags of one employee",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/staff/{{newStaffNumber}}/security-flags",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "staff",
+                "{{newStaffNumber}}",
+                "security-flags"
+              ]
+            },
+            "description": ""
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 200', () => pm.expect(pm.response.code).to.be.oneOf([200]));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "All flags",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/security-flags?",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "security-flags"
+              ],
+              "query": [
+                {
+                  "key": "status",
+                  "value": "Active",
+                  "disabled": true
+                },
+                {
+                  "key": "flagType",
+                  "value": "",
+                  "disabled": true
+                }
+              ]
+            },
+            "description": ""
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 200', () => pm.expect(pm.response.code).to.be.oneOf([200]));"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "08 Budget integration (Staff/HR endpoints)",
+      "description": "Our endpoints that call Budget's Finance API. Writes here create records in Budget's system.",
+      "item": [
+        {
+          "name": "Send hire to Budget (funding request)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/requisitions/{{requisitionNumber}}/funding-request",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "requisitions",
+                "{{requisitionNumber}}",
+                "funding-request"
+              ]
+            },
+            "description": "Requisition must be a hire in HRReview (06 \u203a Start HR review). Leave annualCostPerPosition out to estimate it. Saves fundingRequestId.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"annualCostPerPosition\": 65000,\n  \"urgent\": false\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 200', () => pm.expect(pm.response.code).to.be.oneOf([200]));",
+                  "if (pm.response.code < 300) { const j = pm.response.json(); pm.collectionVariables.set('fundingRequestId', j.funding.requestId); }",
+                  "pm.test('Awaiting Budget', () => pm.expect(pm.response.json().status).to.eql('AwaitingBudget'));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Check Budget's decision now",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/requisitions/{{requisitionNumber}}/funding-request/sync",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "requisitions",
+                "{{requisitionNumber}}",
+                "funding-request",
+                "sync"
+              ]
+            },
+            "description": "Approved \u2192 Approved, Rejected \u2192 Rejected, pending \u2192 unchanged.",
+            "body": {
+              "mode": "raw",
+              "raw": "{}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 200', () => pm.expect(pm.response.code).to.be.oneOf([200]));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Department budget",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/departments/{{departmentCode}}/budget",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "departments",
+                "{{departmentCode}}",
+                "budget"
+              ]
+            },
+            "description": ""
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 200 or 502 or 503', () => pm.expect(pm.response.code).to.be.oneOf([200, 502, 503]));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Send payroll statements to Budget",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/headcounts/payroll/statements",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "headcounts",
+                "payroll",
+                "statements"
+              ]
+            },
+            "description": "Payroll role. Monthly salary cost per department as Budget expenses; never sent twice for a month.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"period\": \"{{period}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 200', () => pm.expect(pm.response.code).to.be.oneOf([200]));"
+                ]
+              }
+            },
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.collectionVariables.set('period', new Date().toISOString().slice(0, 7));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Payroll statements of a month",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/headcounts/payroll/statements?period={{period}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "headcounts",
+                "payroll",
+                "statements"
+              ],
+              "query": [
+                {
+                  "key": "period",
+                  "value": "{{period}}"
+                }
+              ]
+            },
+            "description": ""
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 200', () => pm.expect(pm.response.code).to.be.oneOf([200]));"
+                ]
+              }
+            },
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.collectionVariables.set('period', new Date().toISOString().slice(0, 7));"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "09 Payroll (salary)",
+      "description": "StaffHr.Payroll role only. StaffHr.Admin does not include it.",
+      "item": [
+        {
+          "name": "Set compensation",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/staff/{{newStaffNumber}}/compensation",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "staff",
+                "{{newStaffNumber}}",
+                "compensation"
+              ]
+            },
+            "description": "",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"payBand\": \"EMS-2\",\n  \"annualSalary\": 68000,\n  \"effectiveFrom\": \"{{today}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 200', () => pm.expect(pm.response.code).to.be.oneOf([200]));"
+                ]
+              }
+            },
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.collectionVariables.set('today', new Date().toISOString().slice(0, 10));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Pay history",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/staff/{{staffNumber}}/compensation",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "staff",
+                "{{staffNumber}}",
+                "compensation"
+              ]
+            },
+            "description": ""
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 200', () => pm.expect(pm.response.code).to.be.oneOf([200]));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Payroll headcount",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/headcounts/payroll?",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "headcounts",
+                "payroll"
+              ],
+              "query": [
+                {
+                  "key": "asOf",
+                  "value": "",
+                  "disabled": true
+                }
+              ]
+            },
+            "description": ""
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 200', () => pm.expect(pm.response.code).to.be.oneOf([200]));"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "10 Audit",
+      "description": "",
+      "item": [
+        {
+          "name": "Audit log",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/audit?page=1&pageSize=50",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "audit"
+              ],
+              "query": [
+                {
+                  "key": "entityType",
+                  "value": "Requisition",
+                  "disabled": true
+                },
+                {
+                  "key": "entityId",
+                  "value": "{{requisitionNumber}}",
+                  "disabled": true
+                },
+                {
+                  "key": "actorId",
+                  "value": "",
+                  "disabled": true
+                },
+                {
+                  "key": "page",
+                  "value": "1"
+                },
+                {
+                  "key": "pageSize",
+                  "value": "50"
+                }
+              ]
+            },
+            "description": ""
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 200', () => pm.expect(pm.response.code).to.be.oneOf([200]));"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "11 Roles & access (Development only)",
+      "description": "In Development, X-Dev-* headers act as other callers. In production these need real Entra ID tokens.",
+      "item": [
+        {
+          "name": "Read-only caller cannot onboard \u2192 403",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "X-Dev-Roles",
+                "value": "StaffHr.Read"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/staff",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "staff"
+              ]
+            },
+            "description": "",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"firstName\": \"Avery\",\n  \"lastName\": \"Postman\",\n  \"preferredName\": \"Ave\",\n  \"email\": \"postman.{{$guid}}@cmes.example\",\n  \"dateOfBirth\": \"1997-04-12\",\n  \"phone\": \"555-0199\",\n  \"citizenId\": \"CIT-FAKE-000123\",\n  \"hireDate\": \"{{today}}\",\n  \"employmentType\": \"FullTime\",\n  \"employmentStatus\": \"Probation\",\n  \"homeDepartmentCode\": \"EMS\",\n  \"initialAssignment\": {\n    \"serviceId\": 1,\n    \"roleTitle\": \"Primary Care Paramedic\"\n  }\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 403', () => pm.expect(pm.response.code).to.be.oneOf([403]));"
+                ]
+              }
+            },
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.collectionVariables.set('today', new Date().toISOString().slice(0, 10));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Admin cannot see salary \u2192 403",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "X-Dev-Roles",
+                "value": "StaffHr.Admin"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/staff/{{staffNumber}}/compensation",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "staff",
+                "{{staffNumber}}",
+                "compensation"
+              ]
+            },
+            "description": ""
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 403', () => pm.expect(pm.response.code).to.be.oneOf([403]));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "No sign-in \u2192 401",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "X-Dev-Anonymous",
+                "value": "true"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/staff",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "staff"
+              ]
+            },
+            "description": ""
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 401', () => pm.expect(pm.response.code).to.be.oneOf([401]));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Department-scoped caller (PTR only)",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "X-Dev-Roles",
+                "value": "StaffHr.Read"
+              },
+              {
+                "key": "X-Dev-Department",
+                "value": "PTR"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/staff",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "staff"
+              ]
+            },
+            "description": "Sees only PTR staff."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 200', () => pm.expect(pm.response.code).to.be.oneOf([200]));",
+                  "pm.test('Only PTR', () => pm.response.json().items.forEach(s => pm.expect(s.homeDepartment.code).to.eql('PTR')));"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "12 Budget & Treasury Finance API (direct)",
+      "description": "Budget's own API, to check what Staff/HR sent and to play Budget's part. Budget codes: EMS, SEC, TRANSIT, UTIL, FIN, RES, HR. Writes affect Budget's shared test system.",
+      "item": [
+        {
+          "name": "Budget health",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{budgetUrl}}/health",
+              "host": [
+                "{{budgetUrl}}"
+              ],
+              "path": [
+                "health"
+              ]
+            },
+            "description": ""
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 200', () => pm.expect(pm.response.code).to.be.oneOf([200]));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Allocations",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{budgetUrl}}/api/budget/v1/allocations",
+              "host": [
+                "{{budgetUrl}}"
+              ],
+              "path": [
+                "api",
+                "budget",
+                "v1",
+                "allocations"
+              ]
+            },
+            "description": ""
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 200', () => pm.expect(pm.response.code).to.be.oneOf([200]));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Allocation of a department",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{budgetUrl}}/api/budget/v1/allocations/{{budgetDepartmentCode}}",
+              "host": [
+                "{{budgetUrl}}"
+              ],
+              "path": [
+                "api",
+                "budget",
+                "v1",
+                "allocations",
+                "{{budgetDepartmentCode}}"
+              ]
+            },
+            "description": ""
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 200', () => pm.expect(pm.response.code).to.be.oneOf([200]));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Budgets",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{budgetUrl}}/api/budget/v1/budgets",
+              "host": [
+                "{{budgetUrl}}"
+              ],
+              "path": [
+                "api",
+                "budget",
+                "v1",
+                "budgets"
+              ]
+            },
+            "description": ""
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 200', () => pm.expect(pm.response.code).to.be.oneOf([200]));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Budget summary",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{budgetUrl}}/api/budget/v1/budgets/summary",
+              "host": [
+                "{{budgetUrl}}"
+              ],
+              "path": [
+                "api",
+                "budget",
+                "v1",
+                "budgets",
+                "summary"
+              ]
+            },
+            "description": ""
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 200', () => pm.expect(pm.response.code).to.be.oneOf([200]));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Budget of a department",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{budgetUrl}}/api/budget/v1/budgets/{{budgetDepartmentCode}}",
+              "host": [
+                "{{budgetUrl}}"
+              ],
+              "path": [
+                "api",
+                "budget",
+                "v1",
+                "budgets",
+                "{{budgetDepartmentCode}}"
+              ]
+            },
+            "description": ""
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 200', () => pm.expect(pm.response.code).to.be.oneOf([200]));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Funding requests",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{budgetUrl}}/api/budget/v1/funding-requests",
+              "host": [
+                "{{budgetUrl}}"
+              ],
+              "path": [
+                "api",
+                "budget",
+                "v1",
+                "funding-requests"
+              ]
+            },
+            "description": "status: 0 Pending, 1 Approved, 2 Rejected."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 200', () => pm.expect(pm.response.code).to.be.oneOf([200]));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Approve funding request (Budget's decision)",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{budgetUrl}}/api/budget/v1/funding-requests/{{fundingRequestId}}/decision",
+              "host": [
+                "{{budgetUrl}}"
+              ],
+              "path": [
+                "api",
+                "budget",
+                "v1",
+                "funding-requests",
+                "{{fundingRequestId}}",
+                "decision"
+              ]
+            },
+            "description": "What Budget does in its own system. fundingRequestId comes from 08 \u203a Send hire to Budget.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"approved\": true\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 200', () => pm.expect(pm.response.code).to.be.oneOf([200]));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Reject funding request (Budget's decision)",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{budgetUrl}}/api/budget/v1/funding-requests/{{fundingRequestId}}/decision",
+              "host": [
+                "{{budgetUrl}}"
+              ],
+              "path": [
+                "api",
+                "budget",
+                "v1",
+                "funding-requests",
+                "{{fundingRequestId}}",
+                "decision"
+              ]
+            },
+            "description": "",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"approved\": false\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 200', () => pm.expect(pm.response.code).to.be.oneOf([200]));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Expenses",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{budgetUrl}}/api/budget/v1/expenses?department={{budgetDepartmentCode}}&page=1&pageSize=25",
+              "host": [
+                "{{budgetUrl}}"
+              ],
+              "path": [
+                "api",
+                "budget",
+                "v1",
+                "expenses"
+              ],
+              "query": [
+                {
+                  "key": "department",
+                  "value": "{{budgetDepartmentCode}}"
+                },
+                {
+                  "key": "page",
+                  "value": "1"
+                },
+                {
+                  "key": "pageSize",
+                  "value": "25"
+                }
+              ]
+            },
+            "description": ""
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 200', () => pm.expect(pm.response.code).to.be.oneOf([200]));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Report summary",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{budgetUrl}}/api/budget/v1/reports/summary?from={{monthStart}}&to={{monthEnd}}",
+              "host": [
+                "{{budgetUrl}}"
+              ],
+              "path": [
+                "api",
+                "budget",
+                "v1",
+                "reports",
+                "summary"
+              ],
+              "query": [
+                {
+                  "key": "from",
+                  "value": "{{monthStart}}"
+                },
+                {
+                  "key": "to",
+                  "value": "{{monthEnd}}"
+                }
+              ]
+            },
+            "description": "Spending and revenue for a date range (both required); defaults to this month."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 200', () => pm.expect(pm.response.code).to.be.oneOf([200]));"
+                ]
+              }
+            },
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const n = new Date(); const y = n.getUTCFullYear(), m = n.getUTCMonth();",
+                  "pm.collectionVariables.set('monthStart', new Date(Date.UTC(y, m, 1)).toISOString().slice(0, 10));",
+                  "pm.collectionVariables.set('monthEnd', new Date(Date.UTC(y, m + 1, 0)).toISOString().slice(0, 10));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Revenue",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{budgetUrl}}/api/budget/v1/revenue",
+              "host": [
+                "{{budgetUrl}}"
+              ],
+              "path": [
+                "api",
+                "budget",
+                "v1",
+                "revenue"
+              ]
+            },
+            "description": ""
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 200', () => pm.expect(pm.response.code).to.be.oneOf([200]));"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "13 Scenarios (run with Collection Runner)",
+      "description": "Run a scenario folder top to bottom with the Collection Runner. Each request saves the ids the next one needs.",
+      "item": [
+        {
+          "name": "Hire funded by Budget (end to end)",
+          "description": "Creates a funding request in Budget's test system and approves it.",
+          "item": [
+            {
+              "name": "1 Raise hire",
+              "request": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Accept",
+                    "value": "application/json"
+                  },
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  },
+                  {
+                    "key": "Idempotency-Key",
+                    "value": "{{$guid}}"
+                  }
+                ],
+                "url": {
+                  "raw": "{{baseUrl}}/requisitions",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "requisitions"
+                  ]
+                },
+                "description": "",
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"type\": \"Hire\",\n  \"departmentCode\": \"EMS\",\n  \"roleTitle\": \"Primary Care Paramedic\",\n  \"positions\": 1,\n  \"reasonCode\": \"VACANCY\"\n}",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                }
+              },
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "pm.test('Status is 201', () => pm.expect(pm.response.code).to.be.oneOf([201]));",
+                      "if (pm.response.code < 300) { const j = pm.response.json(); pm.collectionVariables.set('requisitionNumber', j.requisitionNumber); }"
+                    ]
+                  }
+                }
+              ]
+            },
+            {
+              "name": "2 Start HR review",
+              "request": {
+                "method": "PATCH",
+                "header": [
+                  {
+                    "key": "Accept",
+                    "value": "application/json"
+                  },
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "url": {
+                  "raw": "{{baseUrl}}/requisitions/{{requisitionNumber}}",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "requisitions",
+                    "{{requisitionNumber}}"
+                  ]
+                },
+                "description": "",
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"status\": \"HRReview\"\n}",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                }
+              },
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "pm.test('Status is 200', () => pm.expect(pm.response.code).to.be.oneOf([200]));"
+                    ]
+                  }
+                }
+              ]
+            },
+            {
+              "name": "3 Send to Budget",
+              "request": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Accept",
+                    "value": "application/json"
+                  },
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "url": {
+                  "raw": "{{baseUrl}}/requisitions/{{requisitionNumber}}/funding-request",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "requisitions",
+                    "{{requisitionNumber}}",
+                    "funding-request"
+                  ]
+                },
+                "description": "",
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"annualCostPerPosition\": 65000,\n  \"urgent\": false\n}",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                }
+              },
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "pm.test('Status is 200', () => pm.expect(pm.response.code).to.be.oneOf([200]));",
+                      "if (pm.response.code < 300) { const j = pm.response.json(); pm.collectionVariables.set('fundingRequestId', j.funding.requestId); }"
+                    ]
+                  }
+                }
+              ]
+            },
+            {
+              "name": "4 Budget sees the request",
+              "request": {
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "Accept",
+                    "value": "application/json"
+                  }
+                ],
+                "url": {
+                  "raw": "{{budgetUrl}}/api/budget/v1/funding-requests",
+                  "host": [
+                    "{{budgetUrl}}"
+                  ],
+                  "path": [
+                    "api",
+                    "budget",
+                    "v1",
+                    "funding-requests"
+                  ]
+                },
+                "description": ""
+              },
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "pm.test('Status is 200', () => pm.expect(pm.response.code).to.be.oneOf([200]));",
+                      "pm.test('Our request is there and pending', () => { const r = pm.response.json().find(x => x.id === pm.collectionVariables.get('fundingRequestId')); pm.expect(r).to.exist; pm.expect(r.reason).to.include(pm.collectionVariables.get('requisitionNumber')); pm.expect(r.status).to.be.oneOf([0, 'Pending']); });"
+                    ]
+                  }
+                }
+              ]
+            },
+            {
+              "name": "5 Budget approves",
+              "request": {
+                "method": "PUT",
+                "header": [
+                  {
+                    "key": "Accept",
+                    "value": "application/json"
+                  },
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "url": {
+                  "raw": "{{budgetUrl}}/api/budget/v1/funding-requests/{{fundingRequestId}}/decision",
+                  "host": [
+                    "{{budgetUrl}}"
+                  ],
+                  "path": [
+                    "api",
+                    "budget",
+                    "v1",
+                    "funding-requests",
+                    "{{fundingRequestId}}",
+                    "decision"
+                  ]
+                },
+                "description": "",
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"approved\": true\n}",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                }
+              },
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "pm.test('Status is 200', () => pm.expect(pm.response.code).to.be.oneOf([200]));"
+                    ]
+                  }
+                }
+              ]
+            },
+            {
+              "name": "6 Staff/HR reads the decision",
+              "request": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Accept",
+                    "value": "application/json"
+                  },
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "url": {
+                  "raw": "{{baseUrl}}/requisitions/{{requisitionNumber}}/funding-request/sync",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "requisitions",
+                    "{{requisitionNumber}}",
+                    "funding-request",
+                    "sync"
+                  ]
+                },
+                "description": "",
+                "body": {
+                  "mode": "raw",
+                  "raw": "{}",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                }
+              },
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "pm.test('Status is 200', () => pm.expect(pm.response.code).to.be.oneOf([200]));",
+                      "pm.test('Approved', () => { pm.expect(pm.response.json().status).to.eql('Approved'); pm.expect(pm.response.json().budgetDecision).to.eql('Approved'); });"
+                    ]
+                  }
+                }
+              ]
+            },
+            {
+              "name": "7 Start filling",
+              "request": {
+                "method": "PATCH",
+                "header": [
+                  {
+                    "key": "Accept",
+                    "value": "application/json"
+                  },
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "url": {
+                  "raw": "{{baseUrl}}/requisitions/{{requisitionNumber}}",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "requisitions",
+                    "{{requisitionNumber}}"
+                  ]
+                },
+                "description": "",
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"status\": \"Filling\"\n}",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                }
+              },
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "pm.test('Status is 200', () => pm.expect(pm.response.code).to.be.oneOf([200]));"
+                    ]
+                  }
+                }
+              ]
+            },
+            {
+              "name": "8 Onboard the hire",
+              "request": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Accept",
+                    "value": "application/json"
+                  },
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "url": {
+                  "raw": "{{baseUrl}}/staff",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "staff"
+                  ]
+                },
+                "description": "",
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"firstName\": \"Avery\",\n  \"lastName\": \"Postman\",\n  \"preferredName\": \"Ave\",\n  \"email\": \"postman.{{$guid}}@cmes.example\",\n  \"dateOfBirth\": \"1997-04-12\",\n  \"phone\": \"555-0199\",\n  \"citizenId\": \"CIT-FAKE-000123\",\n  \"hireDate\": \"{{today}}\",\n  \"employmentType\": \"FullTime\",\n  \"employmentStatus\": \"Probation\",\n  \"homeDepartmentCode\": \"EMS\",\n  \"initialAssignment\": {\n    \"serviceId\": 1,\n    \"roleTitle\": \"Primary Care Paramedic\"\n  }\n}",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                }
+              },
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "pm.test('Status is 201', () => pm.expect(pm.response.code).to.be.oneOf([201]));",
+                      "if (pm.response.code < 300) { const j = pm.response.json(); pm.collectionVariables.set('newStaffNumber', j.staffNumber); }"
+                    ]
+                  }
+                },
+                {
+                  "listen": "prerequest",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "pm.collectionVariables.set('today', new Date().toISOString().slice(0, 10));"
+                    ]
+                  }
+                }
+              ]
+            },
+            {
+              "name": "9 Fill and complete",
+              "request": {
+                "method": "PATCH",
+                "header": [
+                  {
+                    "key": "Accept",
+                    "value": "application/json"
+                  },
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "url": {
+                  "raw": "{{baseUrl}}/requisitions/{{requisitionNumber}}",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "requisitions",
+                    "{{requisitionNumber}}"
+                  ]
+                },
+                "description": "",
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"positionsFilled\": 1,\n  \"status\": \"Completed\"\n}",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                }
+              },
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "pm.test('Status is 200', () => pm.expect(pm.response.code).to.be.oneOf([200]));",
+                      "pm.test('Completed', () => pm.expect(pm.response.json().status).to.eql('Completed'));"
+                    ]
+                  }
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "name": "Termination",
+          "description": "Onboards a test employee, then terminates them.",
+          "item": [
+            {
+              "name": "1 Onboard someone",
+              "request": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Accept",
+                    "value": "application/json"
+                  },
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "url": {
+                  "raw": "{{baseUrl}}/staff",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "staff"
+                  ]
+                },
+                "description": "",
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"firstName\": \"Avery\",\n  \"lastName\": \"Postman\",\n  \"preferredName\": \"Ave\",\n  \"email\": \"postman.{{$guid}}@cmes.example\",\n  \"dateOfBirth\": \"1997-04-12\",\n  \"phone\": \"555-0199\",\n  \"citizenId\": \"CIT-FAKE-000123\",\n  \"hireDate\": \"{{today}}\",\n  \"employmentType\": \"FullTime\",\n  \"employmentStatus\": \"Probation\",\n  \"homeDepartmentCode\": \"EMS\",\n  \"initialAssignment\": {\n    \"serviceId\": 1,\n    \"roleTitle\": \"Primary Care Paramedic\"\n  }\n}",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                }
+              },
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "pm.test('Status is 201', () => pm.expect(pm.response.code).to.be.oneOf([201]));",
+                      "if (pm.response.code < 300) { const j = pm.response.json(); pm.collectionVariables.set('newStaffNumber', j.staffNumber); }"
+                    ]
+                  }
+                },
+                {
+                  "listen": "prerequest",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "pm.collectionVariables.set('today', new Date().toISOString().slice(0, 10));"
+                    ]
+                  }
+                }
+              ]
+            },
+            {
+              "name": "2 Raise termination",
+              "request": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Accept",
+                    "value": "application/json"
+                  },
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  },
+                  {
+                    "key": "Idempotency-Key",
+                    "value": "{{$guid}}"
+                  }
+                ],
+                "url": {
+                  "raw": "{{baseUrl}}/requisitions",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "requisitions"
+                  ]
+                },
+                "description": "",
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"type\": \"Termination\",\n  \"staffNumber\": \"{{newStaffNumber}}\",\n  \"reasonCode\": \"RESIGNATION\"\n}",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                }
+              },
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "pm.test('Status is 201', () => pm.expect(pm.response.code).to.be.oneOf([201]));",
+                      "if (pm.response.code < 300) { const j = pm.response.json(); pm.collectionVariables.set('terminationNumber', j.requisitionNumber); }"
+                    ]
+                  }
+                }
+              ]
+            },
+            {
+              "name": "3 HR review",
+              "request": {
+                "method": "PATCH",
+                "header": [
+                  {
+                    "key": "Accept",
+                    "value": "application/json"
+                  },
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "url": {
+                  "raw": "{{baseUrl}}/requisitions/{{terminationNumber}}",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "requisitions",
+                    "{{terminationNumber}}"
+                  ]
+                },
+                "description": "",
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"status\": \"HRReview\"\n}",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                }
+              },
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "pm.test('Status is 200', () => pm.expect(pm.response.code).to.be.oneOf([200]));"
+                    ]
+                  }
+                }
+              ]
+            },
+            {
+              "name": "4 Approve",
+              "request": {
+                "method": "PATCH",
+                "header": [
+                  {
+                    "key": "Accept",
+                    "value": "application/json"
+                  },
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "url": {
+                  "raw": "{{baseUrl}}/requisitions/{{terminationNumber}}",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "requisitions",
+                    "{{terminationNumber}}"
+                  ]
+                },
+                "description": "",
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"status\": \"Approved\"\n}",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                }
+              },
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "pm.test('Status is 200', () => pm.expect(pm.response.code).to.be.oneOf([200]));"
+                    ]
+                  }
+                }
+              ]
+            },
+            {
+              "name": "5 Complete (terminates)",
+              "request": {
+                "method": "PATCH",
+                "header": [
+                  {
+                    "key": "Accept",
+                    "value": "application/json"
+                  },
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "url": {
+                  "raw": "{{baseUrl}}/requisitions/{{terminationNumber}}",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "requisitions",
+                    "{{terminationNumber}}"
+                  ]
+                },
+                "description": "",
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"status\": \"Completed\"\n}",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                }
+              },
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "pm.test('Status is 200', () => pm.expect(pm.response.code).to.be.oneOf([200]));"
+                    ]
+                  }
+                }
+              ]
+            },
+            {
+              "name": "6 Now not eligible",
+              "request": {
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "Accept",
+                    "value": "application/json"
+                  }
+                ],
+                "url": {
+                  "raw": "{{baseUrl}}/staff/{{newStaffNumber}}/eligibility",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "staff",
+                    "{{newStaffNumber}}",
+                    "eligibility"
+                  ]
+                },
+                "description": ""
+              },
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "pm.test('Status is 200', () => pm.expect(pm.response.code).to.be.oneOf([200]));",
+                      "pm.test('Not eligible', () => pm.expect(pm.response.json().eligible).to.eql(false));"
+                    ]
+                  }
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "variable": [
+    {
+      "key": "staffNumber",
+      "value": "STF-0000002"
+    },
+    {
+      "key": "serviceId",
+      "value": "1"
+    },
+    {
+      "key": "departmentCode",
+      "value": "EMS"
+    },
+    {
+      "key": "budgetDepartmentCode",
+      "value": "EMS"
+    },
+    {
+      "key": "newStaffNumber",
+      "value": ""
+    },
+    {
+      "key": "requisitionNumber",
+      "value": "REQ-0000005"
+    },
+    {
+      "key": "terminationNumber",
+      "value": ""
+    },
+    {
+      "key": "fundingRequestId",
+      "value": ""
+    },
+    {
+      "key": "assignmentId",
+      "value": ""
+    },
+    {
+      "key": "credentialId",
+      "value": ""
+    },
+    {
+      "key": "rosterEntryId",
+      "value": ""
+    },
+    {
+      "key": "today",
+      "value": ""
+    },
+    {
+      "key": "period",
+      "value": ""
+    },
+    {
+      "key": "shiftStart",
+      "value": ""
+    },
+    {
+      "key": "shiftEnd",
+      "value": ""
+    },
+    {
+      "key": "fromDate",
+      "value": ""
+    },
+    {
+      "key": "toDate",
+      "value": ""
+    },
+    {
+      "key": "tomorrow",
+      "value": ""
+    },
+    {
+      "key": "monthStart",
+      "value": ""
+    },
+    {
+      "key": "monthEnd",
+      "value": ""
+    }
+  ]
+}

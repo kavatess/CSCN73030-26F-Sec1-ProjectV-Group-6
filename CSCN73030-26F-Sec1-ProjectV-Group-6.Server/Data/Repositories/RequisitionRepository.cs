@@ -61,6 +61,13 @@ public class RequisitionRepository
                                        r.Status != RequisitionStatus.Rejected &&
                                        r.Status != RequisitionStatus.Closed);
 
+    /// <summary>Hire requisitions waiting on a funding request that Budget has not decided yet.</summary>
+    public Task<List<Requisition>> ListAwaitingFundingDecisionAsync() =>
+        WithDetails()
+            .Where(r => r.Status == RequisitionStatus.AwaitingBudget && r.FundingRequestId != null)
+            .OrderBy(r => r.FundingRequestedAtUtc)
+            .ToListAsync();
+
     /// <summary>Adds a new requisition to be inserted on the next save.</summary>
     /// <param name="requisition">The new requisition.</param>
     public void Add(Requisition requisition) => _db.Requisitions.Add(requisition);

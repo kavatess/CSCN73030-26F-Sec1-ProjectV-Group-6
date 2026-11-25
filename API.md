@@ -1,6 +1,6 @@
 # CMES Staff/HR API (v1)
 
-Contract for review by the other CMES groups: 33 endpoints plus the Service Bus events at the end. The live, always-current version is the OpenAPI document at
+Contract for review by the other CMES groups: 38 endpoints plus the Service Bus events at the end. The live, always-current version is the OpenAPI document at
 `/openapi/v1.json`, browsable at `/swagger` when the service runs in Development.
 
 ## Conventions
@@ -196,6 +196,17 @@ Sorted by last name, first name. `200` → `PagedResult<StaffSummary>` · `400` 
 - `onDuty`: distinct staff on a non-cancelled shift right now in the department's services.
 - `vacancies`: `positions − positionsFilled` summed over Hire requisitions in Approved or Filling.
 
+### `GET /departments/{code}/budget`
+
+The department's budget, read live from Budget and Treasury (`GET /api/budget/v1/budgets/{budgetCode}`).
+
+```json
+{ "code": "PTR", "name": "Public Transport", "budgetDepartmentCode": "TRANSIT",
+  "allocated": 4000000.00, "spent": 0.00, "remaining": 4000000.00, "lowBudget": false }
+```
+
+`200` · `404` unknown department, or none in Budget · `502` Budget failed · `503` integration off
+
 ## Assignments
 
 ### `POST /staff/{staffNumber}/assignments`
@@ -341,6 +352,36 @@ the termination in one transaction:
 
 `200` → `Requisition` · `400` · `404` · `422`
 
+### Funding by Budget and Treasury
+
+Hire requisitions are funded through Budget's Finance API. `Requisition` carries
+`funding: { requestId, amount, urgent, requestedAtUtc, decidedAtUtc?, lastCheckedAtUtc? }`, or `null` until HR sends
+it to Budget. `requestId` is Budget's id for the funding request.
+
+#### `POST /requisitions/{number}/funding-request` (StaffHr.Admin)
+
+```json
+{ "annualCostPerPosition": 61500.00, "urgent": false }   // both optional
+```
+
+Sends a **hire in HRReview** to Budget: creates `POST /api/budget/v1/funding-requests` in Budget for
+`positions × annualCostPerPosition` (estimated from current salaries in the same role, else the department, when
+omitted) under Budget's department code, with a reason starting with the requisition number, then moves the
+requisition to `AwaitingBudget` with `budgetDecision: "Pending"`. Nothing changes if Budget fails.
+
+`200` → `Requisition` · `404` · `409` already sent · `422` not a hire in HRReview, or bad cost · `502` Budget failed ·
+`503` integration off (`Budget:BaseUrl` empty)
+
+#### `POST /requisitions/{number}/funding-request/sync` (StaffHr.Admin)
+
+Asks Budget for the decision now (`GET /api/budget/v1/funding-requests`). Budget status `1` (Approved) moves the
+requisition to `Approved` / `budgetDecision: "Approved"`; `2` (Rejected) to `Rejected` / `"Rejected"`; `0` changes
+nothing. A requisition HR already moved on (e.g. `Closed`) keeps its status. A background check does the same every
+5 minutes (`Budget:SyncIntervalMinutes`). `200` → `Requisition` · `404` · `422` never sent · `502`
+
+Department codes are mapped to Budget's: `PTR → TRANSIT`, `MNT → UTIL`, `BUD → FIN`, `HRS → HR`; `EMS`, `SEC`, `RES`
+are the same (`Budget:DepartmentCodes`).
+
 ## Credentials
 
 Status is derived on every read from `expiryDate` (UTC today): **Expired** if `expiryDate` is before today,
@@ -478,6 +519,31 @@ For the Budget service. `asOf` (a date) defaults to today. On payroll means hire
 
 `partTime` counts PartTime, Contract and Seasonal employees. `missingCompensation` counts people on payroll with no
 rate in force. `200` · `400` unreadable date
+
+### `POST /headcounts/payroll/statements` (StaffHr.Payroll)
+
+```json
+{ "period": "2026-11" }   // optional, default the current month
+```
+
+Records each department's salary cost for the month in Budget as an expense (`POST /api/budget/v1/expenses`):
+annual salaries on payroll at the month's end (today, for the current month) ÷ 12, department totals only. A
+department Budget already accepted for that month is skipped, so calling twice records nothing twice; a department
+Budget refused (e.g. over budget) is sent again.
+
+```json
+{ "period": "2026-11", "asOf": "2026-11-25", "totalAmount": 131666.67,
+  "statements": [ { "period": "2026-11", "departmentCode": "EMS", "budgetDepartmentCode": "EMS", "headcount": 8,
+                    "amount": 49916.67, "accepted": true, "message": "Expense recorded", "expenseId": "…",
+                    "remainingBudget": 4450083.33, "sentAtUtc": "…", "sentBy": "dev-user" }, … ] }
+```
+
+`200` · `422` period not `yyyy-MM`, or a month not started · `502` Budget failed (departments sent before the
+failure stay recorded) · `503` integration off
+
+### `GET /headcounts/payroll/statements?period=`
+
+The statements already sent for a month (default: this month), same shape. `200` · `422`
 
 ## Audit
 

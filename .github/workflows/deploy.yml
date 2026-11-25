@@ -14,10 +14,14 @@ on:
         type: choice
         options: [F1, B1]
         default: F1
+      app_location:
+        description: Region for the web app only, if the resource group's region has no App Service quota (e.g. eastus2). Empty = same region
+        required: false
+        default: ''
       sql_free_offer:
-        description: Use the free Azure SQL offer (untick for the Basic tier, about 5 USD a month)
+        description: Use the free Azure SQL offer (runs out after about 55 app hours a month); unticked = Basic tier, about 5 USD a month
         type: boolean
-        default: true
+        default: false
       demo_mode:
         description: Demo mode - no sign-in, fictional data only (until the CMES login service is ready)
         type: boolean
@@ -56,6 +60,7 @@ jobs:
       - name: Provision infrastructure (Bicep)
         id: infra
         run: |
+          app_location="${{ inputs.app_location }}"
           outputs=$(az deployment group create \
             --resource-group "${{ inputs.resource_group }}" \
             --template-file infra/main.bicep \
@@ -65,6 +70,7 @@ jobs:
                          appServiceSku="${{ inputs.app_service_sku }}" \
                          sqlFreeOffer=${{ inputs.sql_free_offer }} \
                          demoMode=${{ inputs.demo_mode }} \
+                         ${app_location:+appServiceLocation=$app_location} \
             --query properties.outputs -o json)
           echo "web_app=$(echo "$outputs" | jq -r .webAppName.value)" >> "$GITHUB_OUTPUT"
           echo "sql_server=$(echo "$outputs" | jq -r .sqlServerName.value)" >> "$GITHUB_OUTPUT"
@@ -76,7 +82,7 @@ jobs:
         run: |
           dotnet tool restore
           dotnet publish CSCN73030-26F-Sec1-ProjectV-Group-6.Server -c Release -o publish
-          dotnet ef migrations bundle --project CSCN73030-26F-Sec1-ProjectV-Group-6.Server \
+          dotnet ef migrations bundle --project CSCN73030-26F-Sec1-ProjectV-Group-6.Server --context CmesDbContext \
             --configuration Release --self-contained -r linux-x64 -o efbundle --force
 
       - name: Apply database migrations (and seed the demo data)
@@ -89,7 +95,27 @@ jobs:
           # Same connection string the template stores in Key Vault for the app.
           connection="Server=tcp:${{ steps.infra.outputs.sql_fqdn }},1433;Database=${{ steps.infra.outputs.database }};User ID=staffhradmin;Password=${SQL_ADMIN_PASSWORD};Encrypt=True;TrustServerCertificate=False;Connection Timeout=120;"
           echo "::add-mask::$connection"
-          ./efbundle --connection "$connection"
+          # A free-offer (serverless) database pauses after an hour without connections. The first connection
+          # wakes it, but until it is back online (usually under a minute) SQL answers error 40613. Retry.
+          for attempt in 1 2 3 4 5 6 7 8 9 10; do
+            if ./efbundle --connection "$connection" > efbundle.log 2>&1; then
+              grep -E "Applying migration|No migrations|Done" efbundle.log || true
+              break
+            fi
+            if grep -q "Error Number:42119" efbundle.log; then
+              echo "::error::The free SQL offer's monthly allowance is used up, so Azure paused the database until the 1st of next month. Re-run this workflow with sql_free_offer unticked (Basic tier), after choosing 'Continue using database with additional charges' under the database's Compute + storage in the Azure portal."
+              exit 1
+            fi
+            if [ "$attempt" = 10 ]; then
+              cat efbundle.log
+              echo "::error::The database is still unavailable after 5 minutes. Its state:"
+              az sql db show -g "${{ inputs.resource_group }}" -s "${{ steps.infra.outputs.sql_server }}" \
+                -n "${{ steps.infra.outputs.database }}" --query "{status:status, sku:currentSku.name, freeLimitExhaustion:freeLimitExhaustionBehavior}" -o table
+              exit 1
+            fi
+            echo "Database not ready yet ($(grep -o 'Error Number:[0-9]*' efbundle.log | head -1 || echo 'no error number')); attempt $attempt of 10, retrying in 30 s"
+            sleep 30
+          done
           if [ "${{ inputs.seed_demo_data }}" = "true" ]; then
             # --seed loads the fictional demo data and exits; it does nothing if the database already has data.
             ConnectionStrings__StaffHr="$connection" ASPNETCORE_ENVIRONMENT=Development \
