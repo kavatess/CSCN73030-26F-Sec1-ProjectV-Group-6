@@ -224,6 +224,65 @@ namespace CSCN73030_26F_Sec1_ProjectV_Group_6.Server.Data.Migrations
                     b.ToTable("OutboxEvent", (string)null);
                 });
 
+            modelBuilder.Entity("CSCN73030_26F_Sec1_ProjectV_Group_6.Server.Domain.PayrollStatement", b =>
+                {
+                    b.Property<int>("PayrollStatementId")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("PayrollStatementId"));
+
+                    b.Property<bool>("Accepted")
+                        .HasColumnType("bit");
+
+                    b.Property<decimal>("Amount")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("decimal(18,2)");
+
+                    b.Property<int>("DepartmentId")
+                        .HasColumnType("int");
+
+                    b.Property<Guid?>("ExpenseId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<int>("Headcount")
+                        .HasColumnType("int");
+
+                    b.Property<string>("Message")
+                        .HasMaxLength(500)
+                        .HasColumnType("nvarchar(500)");
+
+                    b.Property<string>("Period")
+                        .IsRequired()
+                        .HasMaxLength(7)
+                        .HasColumnType("nchar(7)")
+                        .IsFixedLength();
+
+                    b.Property<decimal?>("RemainingBudget")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("decimal(18,2)");
+
+                    b.Property<DateTime>("SentAtUtc")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("SentBy")
+                        .IsRequired()
+                        .HasMaxLength(256)
+                        .HasColumnType("nvarchar(256)");
+
+                    b.HasKey("PayrollStatementId");
+
+                    b.HasIndex("DepartmentId");
+
+                    b.HasIndex("Period", "DepartmentId")
+                        .IsUnique();
+
+                    b.ToTable("PayrollStatement", null, t =>
+                        {
+                            t.HasCheckConstraint("CK_PayrollStatement_Amount", "[Amount] >= 0");
+                        });
+                });
+
             modelBuilder.Entity("CSCN73030_26F_Sec1_ProjectV_Group_6.Server.Domain.Requisition", b =>
                 {
                     b.Property<int>("RequisitionId")
@@ -560,6 +619,17 @@ namespace CSCN73030_26F_Sec1_ProjectV_Group_6.Server.Data.Migrations
                     b.Navigation("CredentialType");
 
                     b.Navigation("Staff");
+                });
+
+            modelBuilder.Entity("CSCN73030_26F_Sec1_ProjectV_Group_6.Server.Domain.PayrollStatement", b =>
+                {
+                    b.HasOne("CSCN73030_26F_Sec1_ProjectV_Group_6.Server.Domain.Department", "Department")
+                        .WithMany()
+                        .HasForeignKey("DepartmentId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("Department");
                 });
 
             modelBuilder.Entity("CSCN73030_26F_Sec1_ProjectV_Group_6.Server.Domain.Requisition", b =>

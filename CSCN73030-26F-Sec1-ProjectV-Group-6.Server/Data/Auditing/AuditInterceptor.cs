@@ -34,6 +34,7 @@ public class AuditInterceptor : SaveChangesInterceptor
         [typeof(Credential)] = e => ((Credential)e).CredentialId.ToString(),
         [typeof(SecurityFlag)] = e => ((SecurityFlag)e).FlagId.ToString(),
         [typeof(Compensation)] = e => ((Compensation)e).CompensationId.ToString(),
+        [typeof(PayrollStatement)] = e => ((PayrollStatement)e).PayrollStatementId.ToString(),
     };
 
     private readonly ICurrentUser _currentUser;

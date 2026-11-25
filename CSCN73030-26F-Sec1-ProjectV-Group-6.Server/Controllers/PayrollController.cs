@@ -20,12 +20,15 @@ namespace CSCN73030_26F_Sec1_ProjectV_Group_6.Server.Controllers;
 public class PayrollController : ControllerBase
 {
     private readonly PayrollService _payrollService;
+    private readonly BudgetLedgerService _ledgerService;
 
     /// <summary>Creates the controller.</summary>
     /// <param name="payrollService">Payroll business logic.</param>
-    public PayrollController(PayrollService payrollService)
+    /// <param name="ledgerService">Payroll statements sent to Budget and Treasury.</param>
+    public PayrollController(PayrollService payrollService, BudgetLedgerService ledgerService)
     {
         _payrollService = payrollService;
+        _ledgerService = ledgerService;
     }
 
     /// <summary>Set an employee's pay from a date. The previous rate is closed on that date. Returns the pay history.</summary>
@@ -57,4 +60,29 @@ public class PayrollController : ControllerBase
         ExampleErrors = ["asOf=The value 'today' is not valid for asOf."])]
     public async Task<ActionResult<PayrollHeadcountDto>> Headcount(DateOnly? asOf) =>
         await _payrollService.HeadcountAsync(asOf);
+
+    /// <summary>
+    /// Sends each department's salary cost for a month to Budget and Treasury as an expense
+    /// (POST /api/budget/v1/expenses): annual salaries on payroll at the month's end (today for the current month)
+    /// divided by 12, department totals only. Departments Budget already accepted for the month are skipped, so
+    /// calling twice records nothing twice. Returns every statement of the month, with Budget's answer.
+    /// </summary>
+    /// <param name="request">Month to send, "yyyy-MM"; defaults to the current month.</param>
+    [HttpPost("headcounts/payroll/statements")]
+    [ProducesResponseType<PayrollStatementsDto>(StatusCodes.Status200OK)]
+    [ProblemResponse(StatusCodes.Status422UnprocessableEntity, "One or more fields are invalid. See 'errors' for details.",
+        ExampleErrors = ["period=Period must be a month written yyyy-MM, e.g. 2026-11."])]
+    [ProblemResponse(StatusCodes.Status502BadGateway, "The Budget service answered 500: Internal error.")]
+    [ProblemResponse(StatusCodes.Status503ServiceUnavailable,
+        "The Budget integration is not configured (set Budget:BaseUrl). Record the funding decision by hand instead.")]
+    public async Task<ActionResult<PayrollStatementsDto>> SendStatements(SendPayrollStatementsRequest? request) =>
+        await _ledgerService.SendStatementsAsync(request ?? new SendPayrollStatementsRequest(null));
+
+    /// <summary>The payroll statements already sent to Budget for a month, with Budget's answers.</summary>
+    /// <param name="period">Month, "yyyy-MM"; defaults to the current month.</param>
+    [HttpGet("headcounts/payroll/statements")]
+    [ProducesResponseType<PayrollStatementsDto>(StatusCodes.Status200OK)]
+    [ProblemResponse(StatusCodes.Status422UnprocessableEntity, "One or more fields are invalid. See 'errors' for details.",
+        ExampleErrors = ["period=Period must be a month written yyyy-MM, e.g. 2026-11."])]
+    public async Task<ActionResult<PayrollStatementsDto>> Statements(string? period) => await _ledgerService.ListStatementsAsync(period);
 }

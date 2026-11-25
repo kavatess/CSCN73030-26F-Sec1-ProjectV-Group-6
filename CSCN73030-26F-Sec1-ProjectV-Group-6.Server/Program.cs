@@ -143,6 +143,8 @@ builder.Services.AddHttpClient<BudgetClient>((services, http) =>
     http.Timeout = TimeSpan.FromSeconds(Math.Max(5, options.TimeoutSeconds));
 });
 builder.Services.AddScoped<BudgetFundingService>();
+builder.Services.AddScoped<BudgetLedgerService>();
+builder.Services.AddScoped<PayrollStatementRepository>();
 builder.Services.AddHostedService<BudgetSyncService>();
 
 var app = builder.Build();
