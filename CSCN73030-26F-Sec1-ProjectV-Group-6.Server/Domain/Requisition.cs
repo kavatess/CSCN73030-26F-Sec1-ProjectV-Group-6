@@ -54,4 +54,22 @@ public class Requisition
 
     /// <summary>When the requisition was created, UTC.</summary>
     public DateTime CreatedAtUtc { get; set; }
+
+    /// <summary>Id of the funding request in Budget's Finance API, once HR sends the requisition to Budget.</summary>
+    public Guid? FundingRequestId { get; set; }
+
+    /// <summary>Amount asked of Budget (annual cost of all positions, CAD).</summary>
+    public decimal? FundingAmount { get; set; }
+
+    /// <summary>Whether the funding request was marked urgent.</summary>
+    public bool FundingUrgent { get; set; }
+
+    /// <summary>When the funding request was sent to Budget, UTC.</summary>
+    public DateTime? FundingRequestedAtUtc { get; set; }
+
+    /// <summary>When Budget decided, UTC (as Budget reports it).</summary>
+    public DateTime? FundingDecidedAtUtc { get; set; }
+
+    /// <summary>When Staff/HR last asked Budget about the request, UTC.</summary>
+    public DateTime? FundingCheckedAtUtc { get; set; }
 }

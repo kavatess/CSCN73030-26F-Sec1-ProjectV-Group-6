@@ -142,6 +142,8 @@ builder.Services.AddHttpClient<BudgetClient>((services, http) =>
     if (options.IsConfigured) http.BaseAddress = new Uri(options.BaseUrl!.TrimEnd('/') + "/");
     http.Timeout = TimeSpan.FromSeconds(Math.Max(5, options.TimeoutSeconds));
 });
+builder.Services.AddScoped<BudgetFundingService>();
+builder.Services.AddHostedService<BudgetSyncService>();
 
 var app = builder.Build();
 

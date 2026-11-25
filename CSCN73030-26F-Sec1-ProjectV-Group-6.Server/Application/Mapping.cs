@@ -129,5 +129,10 @@ public static class Mapping
         requisition.ReasonCode,
         requisition.BudgetDecision,
         requisition.Staff?.StaffNumber,
-        requisition.CreatedAtUtc);
+        requisition.CreatedAtUtc,
+        requisition.FundingRequestId is { } fundingId
+            ? new FundingDto(fundingId, requisition.FundingAmount ?? 0m, requisition.FundingUrgent,
+                requisition.FundingRequestedAtUtc ?? requisition.CreatedAtUtc, requisition.FundingDecidedAtUtc,
+                requisition.FundingCheckedAtUtc)
+            : null);
 }

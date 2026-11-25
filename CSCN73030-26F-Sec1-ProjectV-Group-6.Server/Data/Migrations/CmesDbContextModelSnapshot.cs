@@ -239,6 +239,25 @@ namespace CSCN73030_26F_Sec1_ProjectV_Group_6.Server.Data.Migrations
                     b.Property<DateTime>("CreatedAtUtc")
                         .HasColumnType("datetime2");
 
+                    b.Property<decimal?>("FundingAmount")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("decimal(18,2)");
+
+                    b.Property<DateTime?>("FundingCheckedAtUtc")
+                        .HasColumnType("datetime2");
+
+                    b.Property<DateTime?>("FundingDecidedAtUtc")
+                        .HasColumnType("datetime2");
+
+                    b.Property<Guid?>("FundingRequestId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateTime?>("FundingRequestedAtUtc")
+                        .HasColumnType("datetime2");
+
+                    b.Property<bool>("FundingUrgent")
+                        .HasColumnType("bit");
+
                     b.Property<string>("IdempotencyKey")
                         .IsRequired()
                         .HasMaxLength(100)
@@ -282,6 +301,8 @@ namespace CSCN73030_26F_Sec1_ProjectV_Group_6.Server.Data.Migrations
                         .HasColumnType("nvarchar(20)");
 
                     b.HasKey("RequisitionId");
+
+                    b.HasIndex("FundingRequestId");
 
                     b.HasIndex("IdempotencyKey")
                         .IsUnique();

@@ -70,6 +70,7 @@ public class RequisitionQuery
 /// <param name="BudgetDecision">Budget decision, or null before Budget is asked.</param>
 /// <param name="StaffNumber">Employee concerned (termination only), or null.</param>
 /// <param name="CreatedAtUtc">When it was raised, UTC.</param>
+/// <param name="Funding">The funding request sent to Budget and Treasury, or null if none was sent.</param>
 public record RequisitionDto(
     string RequisitionNumber,
     RequisitionType Type,
@@ -81,4 +82,24 @@ public record RequisitionDto(
     string? ReasonCode,
     BudgetDecision? BudgetDecision,
     string? StaffNumber,
-    DateTime CreatedAtUtc);
+    DateTime CreatedAtUtc,
+    FundingDto? Funding);
+
+/// <summary>A hire requisition's funding request in Budget and Treasury's Finance API.</summary>
+/// <param name="RequestId">Budget's id for the funding request.</param>
+/// <param name="Amount">Amount asked for: annual cost of all positions, CAD.</param>
+/// <param name="Urgent">Whether it was marked urgent.</param>
+/// <param name="RequestedAtUtc">When it was sent, UTC.</param>
+/// <param name="DecidedAtUtc">When Budget decided, UTC, or null while pending.</param>
+/// <param name="LastCheckedAtUtc">When Staff/HR last asked Budget about it, UTC.</param>
+public record FundingDto(Guid RequestId, decimal Amount, bool Urgent, DateTime RequestedAtUtc, DateTime? DecidedAtUtc,
+    DateTime? LastCheckedAtUtc);
+
+/// <summary>
+/// Body of POST /requisitions/{number}/funding-request: sends a hire requisition in HRReview to Budget and Treasury.
+/// Both fields are optional.
+/// </summary>
+/// <param name="AnnualCostPerPosition">Annual cost of one position, CAD. Omit to estimate it from the current
+/// salaries of people in the same role (or else the same department).</param>
+/// <param name="Urgent">Ask Budget to treat it as urgent. Default false.</param>
+public record RequestFundingRequest(decimal? AnnualCostPerPosition, bool? Urgent);
