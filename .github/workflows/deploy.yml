@@ -19,9 +19,9 @@ on:
         required: false
         default: ''
       sql_free_offer:
-        description: Use the free Azure SQL offer (untick for the Basic tier, about 5 USD a month)
+        description: Use the free Azure SQL offer (runs out after about 55 app hours a month); unticked = Basic tier, about 5 USD a month
         type: boolean
-        default: true
+        default: false
       demo_mode:
         description: Demo mode - no sign-in, fictional data only (until the CMES login service is ready)
         type: boolean
@@ -101,6 +101,10 @@ jobs:
             if ./efbundle --connection "$connection" > efbundle.log 2>&1; then
               grep -E "Applying migration|No migrations|Done" efbundle.log || true
               break
+            fi
+            if grep -q "Error Number:42119" efbundle.log; then
+              echo "::error::The free SQL offer's monthly allowance is used up, so Azure paused the database until the 1st of next month. Re-run this workflow with sql_free_offer unticked (Basic tier), after choosing 'Continue using database with additional charges' under the database's Compute + storage in the Azure portal."
+              exit 1
             fi
             if [ "$attempt" = 10 ]; then
               cat efbundle.log

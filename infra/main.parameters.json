@@ -6,7 +6,7 @@
     "sqlAdminLogin": { "value": "staffhradmin" },
     "entraAudience": { "value": "api://cmes-staff-hr" },
     "appServiceSku": { "value": "F1" },
-    "sqlFreeOffer": { "value": true },
+    "sqlFreeOffer": { "value": false },
     "enableServiceBus": { "value": false }
   }
 }

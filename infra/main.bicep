@@ -34,8 +34,9 @@ param entraClientId string = ''
 @description('App Service plan SKU: F1 (free), B1 (basic) or larger.')
 param appServiceSku string = 'B1'
 
-@description('''Use the Azure SQL Database free offer (serverless, 100,000 vCore-seconds and 32 GB a month, auto-pauses
-when the allowance runs out instead of billing). false = Basic tier (about 5 USD a month).''')
+@description('''Use the Azure SQL Database free offer (serverless, 100,000 vCore-seconds and 32 GB a month, paused for the
+rest of the month when the allowance runs out). The app queries the database every few seconds while it runs, so the
+allowance lasts only about 55 running hours a month. false = Basic tier (about 5 USD a month, never paused).''')
 param sqlFreeOffer bool = false
 
 @description('Create the Service Bus namespace and staff-events topic. Without it, events are written to the app log.')
@@ -111,6 +112,8 @@ resource sqlDatabase 'Microsoft.Sql/servers/databases@2023-08-01-preview' = {
         maxSizeBytes: 34359738368 // 32 GB, the free-offer limit
       }
     : {
+        // Explicitly off, so a database moved off the free offer stops being paused by it.
+        useFreeLimit: false
         maxSizeBytes: 2147483648 // 2 GB, the Basic limit
       }
 }
